@@ -42,6 +42,7 @@
 
 ## Authors <a name = "authors"></a>
 - [@niva]() - idea and work
+- [@smbd]() - idea and work
 
 ## How to cite <a name = "cite"></a>
 
