@@ -1,7 +1,3 @@
-# MOCALUM
-
-
-
 <h3 align="center">MOCALUM</h3>
 <h4 align="center">Monte Carlo based Lidar Uncertainty Model</h4>
 
