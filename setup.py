@@ -36,6 +36,7 @@ setup(
                       'netCDF4',
                       'matplotlib',
                       'jupyter',
-                      'pylint'
+                      'pylint',
+                      'tqdm'
                       ]
 )
