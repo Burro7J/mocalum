@@ -30,7 +30,7 @@ setup(
     ],
 
     packages=['mocalum'],  # Required
-    python_requires='==3.7.3',
+    python_requires='>=3.7',
     install_requires=[
                       'xarray',
                       'netCDF4',
