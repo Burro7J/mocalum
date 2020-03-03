@@ -1,6 +1,6 @@
 package:
-  name: 'yaddum'
-  version: '0.2.0'
+  name: 'mocalum'
+  version: '0.1.0'
 
 source:
   path: ../
@@ -23,4 +23,4 @@ requirements:
     - setuptools
 test:
   imports:
-    - yaddum
+    - mocalum

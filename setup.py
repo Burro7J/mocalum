@@ -13,13 +13,13 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
 
-    name='yaddum',  # Required
-    version='0.2.0',  # Required
-    description='Yet Another Dual-Doppler Uncertainty Model (YADDUM): Python libpackage for dual-Doppler uncertainty assessment',  # Optional
+    name='mocalum',  # Required
+    version='0.1.0',  # Required
+    description='Monte Carlo based Lidar Uncertainty Model (MOCALUM): Python libpackage for lidar uncertainty assessment',  # Optional
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/niva83/YADDUM',  # Optional
-    author='Nikola Vasiljevic',  # Optional
+    url='',  # Optional
+    author='Nikola Vasiljevic, Andrea Vignaroli',  # Optional
     author_email='niva@dtu.dk',  # Optional
     classifiers=[  # Optional
         'Development Status :: 4 - Beta',
@@ -29,12 +29,12 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
 
-    packages=['yaddum'],  # Required
+    packages=['mocalum'],  # Required
     python_requires='==3.7.3',
     install_requires=[
-                      'xarray', 
-                      'netCDF4', 
-                      'matplotlib', 
+                      'xarray',
+                      'netCDF4',
+                      'matplotlib',
                       'jupyter',
                       'pylint'
                       ]
