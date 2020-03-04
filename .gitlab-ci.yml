@@ -46,7 +46,8 @@ variables:
   extends: .test_template
   script:
     - cd examples
-    - pytest --nbval
+    - jupyter-nbconvert --to notebook --execute *.ipynb
+    # - pytest --nbval
 
 ########################################
 # Configurations and template modifiers
@@ -83,7 +84,7 @@ variables:
 ########################################
 
 # Master and release branches tests [notebook]:
-nofeat_slow_test_mac:
+nofeat_notebook_test_mac:
   extends: .notebook_test_template
   <<: *not_feat_branch
   <<: *mac
