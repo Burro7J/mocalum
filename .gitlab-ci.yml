@@ -40,7 +40,7 @@ variables:
     - pip install -v .          # install mocalum package before test
 
   after_script:
-    - pip uninstall -y PKG_NAME # uninstall mocalum package after test
+    - pip uninstall -y mocalum # uninstall mocalum package after test
 
 .notebook_test_template: #
   extends: .test_template
