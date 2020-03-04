@@ -1,0 +1,97 @@
+########################################
+# Gitlab CI template for mocalum
+########################################
+
+
+########################################
+# Order of stages
+########################################
+stages:
+  - test
+  # - build
+  # - deploy
+
+########################################
+# Variables
+########################################
+# Global variables:
+variables:
+  # GIT_SUBMODULE_STRATEGY: recursive # assures that submodules are pulled
+  BUILD_PATH: channel
+  CONDA_ENV: mocalum
+  # INST_PATH:
+  PKG_NAME: mocalum
+
+# Comment: if using environmental variables such as DOCS_SSH_KEY
+# make sure they are configured in gitlab CI/CD
+
+
+########################################
+# Templates
+########################################
+
+# Test templates:
+.test_template: #
+  stage: test
+  coverage: '/TOTAL.+?(\d+)%/'
+  before_script:
+    - echo `whoami`
+    - source activate $CONDA_ENV
+    - pip install -v .          # install mocalum package before test
+
+  after_script:
+    - pip uninstall -y PKG_NAME # uninstall mocalum package after test
+
+.notebook_test_template: #
+  extends: .test_template
+  script:
+    - cd examples
+    - pytest --nbval
+
+########################################
+# Configurations and template modifiers
+########################################
+
+# Branch selectors:
+.feat_branches: &feat_branches
+  except:
+    - master
+    - /^release-.*$/
+
+.rel_branches: &rel_branches
+  only:
+    - /^release-.*$
+
+.master_branch: &master_branch
+  only:
+    - master
+
+.not_feat_branch: &not_feat_branch
+  only:
+    - /^release-.*$
+    - master
+
+# OS selectors:
+.mac: &mac
+  tags:
+    - conda
+    - mocalum
+    - macos
+
+########################################
+# Stage: Test
+########################################
+
+# Master and release branches tests [notebook]:
+nofeat_slow_test_mac:
+  extends: .notebook_test_template
+  <<: *not_feat_branch
+  <<: *mac
+
+########################################
+# Stage: Build
+########################################
+
+########################################
+# Stage: Deploy
+########################################
