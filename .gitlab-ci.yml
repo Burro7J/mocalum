@@ -47,8 +47,7 @@ variables:
   script:
     - cd examples
     - jupyter-nbconvert --to notebook --execute *.ipynb
-    - pip uninstall -y $PKG_NAME
-    # - pytest --nbval
+    # - pytest --nbval # other way of testing notebook which fails if there are plots!
 
 ########################################
 # Configurations and template modifiers
