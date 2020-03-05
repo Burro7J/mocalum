@@ -24,7 +24,7 @@
 ## Getting Started <a name = "getting_started"></a>
 
 ### Prerequisites
-Setup ´conda´ enviroment (copy/paste in terminal and hit ENTER):
+Setup `conda` enviroment (copy/paste in terminal and hit ENTER):
 
 ```
 conda create -c conda-forge -n mocalum --strict-channel-priority python=3.7 tqdm jupyter pytest netcdf4 xarray pylint matplotlib nbval
