@@ -46,8 +46,8 @@ variables:
   extends: .test_template
   script:
     - cd examples
-    - jupyter-nbconvert --to notebook --execute *.ipynb
-    # - pytest --nbval # other way of testing notebook which fails if there are plots!
+    # - jupyter-nbconvert --to notebook --execute *.ipynb
+    - pytest --nbval # other way of testing notebook which fails if there are plots!
 
 ########################################
 # Configurations and template modifiers
