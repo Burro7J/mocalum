@@ -2,7 +2,7 @@
 import numpy as np
 import xarray as xr
 from math import degrees, atan2
-
+from .persistance import data
 
 def spher2cart(azimuth, elevation, radius):
     """Converts spherical coordinates to Cartesian coordinates
@@ -45,7 +45,7 @@ def spher2cart(azimuth, elevation, radius):
 
 
 
-def wind_vector_to_los(u,v,w, azimuth, elevation, ignore_elevation = True):
+def project2los(u,v,w, azimuth, elevation, ignore_elevation = True):
     """Projects wind vector to line-of-sight
 
     Parameters
@@ -91,7 +91,7 @@ def wind_vector_to_los(u,v,w, azimuth, elevation, ignore_elevation = True):
 
 
 
-def ivap(los, azimuth, ax = 0):
+def ivap_rc(los, azimuth, ax = 0):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -128,7 +128,7 @@ def ivap(los, azimuth, ax = 0):
 
     return u, v, wind_speed
 
-def dual_Doppler_rc(los, azimuth):
+def dd_rc(los, azimuth):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -163,7 +163,7 @@ def dual_Doppler_rc(los, azimuth):
 
 
 
-def triple_Doppler_rc(los, azimuth, elevation):
+def td_rc(los, azimuth, elevation):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -234,31 +234,33 @@ def get_ivap_probing(sector_size, azimuth_mid, angular_res,
     multip = np.repeat(np.arange(0,no_scans), no_los)
     time = time + multip*to_add
 
-    # needs to add scan_id as dimension
-    ds = xr.Dataset({'az': (['time'], az),
-                     'el': (['time'], el),
-                     'dis': (['time'], dis),
-                     'x': (['time'], xyz),
-                     'y': (['time'], xyz),
-                     'z': (['time'], xyz),
-                     'unc_az': (['time'], unc),
-                     'unc_el': (['time'], unc),
-                     'unc_dis': (['time'], unc),
-                     'unc_los': (['time'], unc),
-                     'u': (['time'], unc),
-                     'v': (['time'], unc),
-                     'w': (['time'], unc),
-                     'v_rad': (['time'], unc),
-                     'sector_size':(sector_size),
-                     'no_scans':(no_scans),
-                     'no_los':(no_los),
-                     'scan_time':(scan_time),
-                     'sweep_back_time':(sweep_time),
-                     },
+    data._cr8_los_ds(az, el, dis,)
 
-                    coords={'time': time})
+    # # needs to add scan_id as dimension
+    # ds = xr.Dataset({'az': (['time'], az),
+    #                  'el': (['time'], el),
+    #                  'dis': (['time'], dis),
+    #                  'x': (['time'], xyz),
+    #                  'y': (['time'], xyz),
+    #                  'z': (['time'], xyz),
+    #                  'unc_az': (['time'], unc),
+    #                  'unc_el': (['time'], unc),
+    #                  'unc_dis': (['time'], unc),
+    #                  'unc_los': (['time'], unc),
+    #                  'u': (['time'], unc),
+    #                  'v': (['time'], unc),
+    #                  'w': (['time'], unc),
+    #                  'v_rad': (['time'], unc),
+    #                  'sector_size':(sector_size),
+    #                  'no_scans':(no_scans),
+    #                  'no_los':(no_los),
+    #                  'scan_time':(scan_time),
+    #                  'sweep_back_time':(sweep_time),
+    #                  },
 
-    return ds
+    #                 coords={'time': time})
+
+    # return ds
 
 
 def add_xyz(ds, lidar_pos):
@@ -271,8 +273,8 @@ def add_xyz(ds, lidar_pos):
 
     return ds
 
-def pl_get_uvw(height, ref_height=100, wind_speed=10,
-               w=0, wind_dir=180, shear_exponent=0.2):
+def get_plaw_uvw(height, ref_height=100, wind_speed=10,
+                 w=0, wind_dir=180, shear_exponent=0.2):
     u = - wind_speed * np.sin(np.radians(wind_dir))
     v = - wind_speed * np.cos(np.radians(wind_dir))
     gain = (height / ref_height)**shear_exponent
@@ -290,13 +292,13 @@ def _fill_in(empty_array, values):
     return full_array
 
 
-def pl_gen_field(ds, ref_height=100, wind_speed=10, w=0, wind_dir=180, shear_exponent=0.2):
+def gen_field_pl(ds, ref_height=100, wind_speed=10, w=0, wind_dir=180, shear_exponent=0.2):
     x_coords = np.arange(ds.x.min(), ds.x.max() + 1, 10)
     y_coords = np.arange(ds.y.min(), ds.y.max() + 1, 10)
     z_coords = np.arange(ds.z.min(), ds.z.max() + 1, 1)
 
     base_array = np.empty((len(z_coords), len(y_coords),len(x_coords)), dtype=float)
-    u, v, w = pl_get_uvw(z_coords, ref_height, wind_speed, w, wind_dir, shear_exponent)
+    u, v, w = get_uvw_pl(z_coords, ref_height, wind_speed, w, wind_dir, shear_exponent)
 
     u_array = _fill_in(base_array, u)
     v_array = _fill_in(base_array, v)
@@ -321,12 +323,12 @@ def inject_wind_data(ds, ds_wind):
     ds.w.values = ds_wind.w.interp(x=ds.x.values.mean(),
                                    y=ds.y.values.mean(),
                                    z = ds.z.values)
-    ds.v_rad.values = wind_vector_to_los(ds.u.values,
-                                         ds.v.values,
-                                         ds.w.values,
-                                         ds.az.values + ds.unc_az.values,
-                                         ds.el.values + ds.unc_el.values,
-                                         ignore_elevation = True)
+    ds.v_rad.values = project2los(ds.u.values,
+                                  ds.v.values,
+                                  ds.w.values,
+                                  ds.az.values + ds.unc_az.values,
+                                  ds.el.values + ds.unc_el.values,
+                                  ignore_elevation = True)
 
     ds.v_rad.values = ds.v_rad.values + ds.unc_los.values
 
