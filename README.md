@@ -4,7 +4,7 @@
 ---
 
 <p align="center"> A Python package for Monte Carlo based lidar uncertainty modeling.
-    <br> 
+    <br>
 </p>
 
 ## Table of Contents
@@ -23,16 +23,43 @@
 
 ## Getting Started <a name = "getting_started"></a>
 
-### Prerequisites
-Setup `conda` enviroment (copy/paste in terminal and hit ENTER):
+### Prerequisite <a name = "required"></a>
+Setup `conda` enviroment with all necessary dependencies needed to run `mocalum` (copy/paste in terminal and hit ENTER):
 
 ```
-conda create -c conda-forge -n mocalum --strict-channel-priority python=3.7 tqdm jupyter pytest netcdf4 xarray pylint matplotlib nbval
+conda create -c conda-forge -n mocalum --strict-channel-priority python=3.7 tqdm jupyter pytest netcdf4 xarray pylint matplotlib nbval scipy
 ```
 
 ### Installing
+Clone repository:
+```
+git clone https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum.git
+```
+
+Afterwards, enter folder of `mocalum`
+```
+cd mocalum
+```
+
+Be sure that you are in the previously made [conda environment](#required):
+```
+conda activate mocalum
+```
+
+Now install `mocalum` in the conda environment with the same name:
+```
+pip install .
+```
 
 ## Running the test <a name = "tests"></a>
+While in `mocalum` folder go to `test` subfolder
+```
+cd test
+```
+and execute script:
+```
+python test_workflow.py
+```
 
 ## Usage <a name="usage"></a>
 
