@@ -37,6 +37,9 @@ setup(
                       'matplotlib',
                       'jupyter',
                       'pylint',
-                      'tqdm'
+                      'tqdm',
+                      'scipy',
+                      'nbval'
+
                       ]
 )
