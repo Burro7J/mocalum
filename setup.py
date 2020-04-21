@@ -32,14 +32,12 @@ setup(
     packages=['mocalum'],  # Required
     python_requires='>=3.6',
     install_requires=[
+                      'numpy',
+                      'pandas',
                       'xarray',
                       'netCDF4',
                       'matplotlib',
-                      'jupyter',
-                      'pylint',
                       'tqdm',
-                      'scipy',
-                      'nbval'
-
+                      'scipy'
                       ]
 )
