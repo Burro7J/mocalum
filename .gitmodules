@@ -1,0 +1,3 @@
+[submodule "modules/pyconturb"]
+	path = modules/pyconturb
+	url = https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb.git
