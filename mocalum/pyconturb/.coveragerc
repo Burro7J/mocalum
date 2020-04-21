@@ -1,7 +1,0 @@
-[run]
-omit = 
-	pyconturb/tests/*
-	pyconturb/io/*
-	pyconturb/_version.py
-[report]
-fail_under = 70
