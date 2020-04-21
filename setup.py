@@ -38,6 +38,9 @@ setup(
                       'netCDF4',
                       'matplotlib',
                       'tqdm',
-                      'scipy'
+                      'scipy',
+                      'pyconturb @ https://api.github.com/repos/User/somerepo/tarball/v0.1.1',
+                      'pyconturb'
+
                       ]
 )
