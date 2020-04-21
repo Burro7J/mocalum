@@ -1,0 +1,48 @@
+# ===== TEST linux=====
+test_pyconturb:  # name the job what we like
+  image: rinkdtu/dockermini:latest
+  #image: python:3.6-slim
+  stage:  # build, test, deploy defined by default [2]
+    test
+  script:  # install dev options, then code, then run tests and do coverage report
+  - pip install -r dev_reqs.txt
+  - pip install -e .
+  - python -m pytest -m "not skipci" --cov-report term-missing:skip-covered --cov=pyconturb --cov-config .coveragerc
+  except:  # don't run on these branches
+  - update_docs
+  tags:  # only runners with this tag can do the job [3]
+  - python
+
+# ===== build documentation =====
+pages:  # "pages" is a job specifically for GitLab pages [1]
+  image: rinkdtu/dockermini:latest
+  stage:  # build, test, deploy defined by default [2]
+    deploy
+  before_script:  # make sure make and pandoc are installed
+  - apt-get update
+  - apt-get install --reinstall make
+  - apt-get install -y pandoc
+  script:  # use sphinx to build docs, move to public page
+  - pip install -r dev_reqs.txt
+  - pip install -e .
+  - cd docs; make html
+  - cd ../; mv docs/build/html public/
+  artifacts:  # required for GitLab pages [1]
+    paths:
+    - public
+  only:  # only run for these branches
+  - master
+  - update_docs
+  tags:  # only runners with this tag can do the job [3]
+  - python
+  
+## ===== Check code style =====
+#check_code_style:  # name the job what we like
+#  image: continuumio/anaconda3:latest
+#  stage:  # build, test, deploy defined by default [2]
+#    test
+#  script:
+#  - pip install -e .
+#  - pycodestyle --ignore=E501,W504 py_wake
+#  tags:  # only runners with this tag can do the job [3]
+#  - python

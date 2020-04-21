@@ -1,0 +1,9 @@
+# requirements for PyConTurb developers
+jupyter  # to run notebooks
+matplotlib  # plotting in notebooks
+nbsphinx==0.3.5  # notebook linking in documentation
+git+https://github.com/vidartf/nbsphinx-link.git  # see above
+pytest  # running tests
+pytest-cov  # calculating coverage
+sphinx  # building documentation
+sphinx_rtd_theme  # theme for documentation
