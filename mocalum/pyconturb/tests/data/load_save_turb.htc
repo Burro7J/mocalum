@@ -1,0 +1,47 @@
+; load turbulence into hawc2 and print it to output
+;
+begin simulation;
+  time_stop    {T:.1f};
+  solvertype   1 ; 
+  on_no_convergence continue ;
+  convergence_limits 1E3 1.0 1E-7 ; 
+  logfile ./load_save_turb.log ;
+  begin newmark;
+    deltat    {dt:.3f};  
+  end newmark;
+end simulation;
+;
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+begin new_htc_structure;
+end new_htc_structure;
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+begin wind ;
+  density                 1.225 ;
+  wsp                     {wsp:.2f}   ;
+  tint                    0.1   ;
+  horizontal_input        1     ; 0=meteorological, 1=horizontal
+  windfield_rotations     0 0.0 0.0 ;    yaw, tilt, rotation
+{str_cntr_pos0}  shear_format            0 0.0 ; 0=none, 3=power law
+  turb_format             1     ;  0=none, 1=mann,2=flex
+  tower_shadow_method     3     ;  0=none, 1=potential flow, 2=jet
+;
+{str_mann};
+;
+end wind ;
+;
+;
+;-------------------------------------------------------------------------------------------------  
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+;
+begin output;
+  filename ./load_save_turb ;
+  time 0 {T:.1f} ;
+  data_format  hawc_binary;
+  buffer 1 ;
+;
+  general time;  
+;  constraint bearing2 pitch3 5;    angle and angle velocity 
+{str_output};
+end output;
+;
+exit;
