@@ -15,10 +15,12 @@ class Data:
         self.probing = None
         self.los = None
         self.ffield = None
+        self.tfield = None
         self.rc_wind = None
         self.fmodel_cfg = {}
         self.meas_cfg = {}
         self.ffield_bbox_cfg = {}
+        self.turb_bbox_cfg = {}
         self.unc_cfg = {'azimuth':{'mu':0, 'std':0.1},
                         'elevation':{'mu':0, 'std':0.1},
                         'range':{'mu':0, 'std':10},
@@ -43,6 +45,61 @@ class Data:
                                           'max':np.max(z_coord),
                                           'res':z_res}})
         self.ffield_bbox_cfg.update({'time_steps':time_steps})
+
+
+
+    def _cr8_tbbox_dict(self,x_coord, y_coord, t_coord, x_res, y_res, t_res):
+        self.turb_bbox_cfg.update({'x':{'min':np.min(x_coord),
+                                          'max':np.max(x_coord),
+                                          'res':x_res}})
+
+        self.turb_bbox_cfg.update({'y':{'min':np.min(y_coord),
+                                          'max':np.max(y_coord),
+                                          'res':y_res}})
+
+        self.turb_bbox_cfg.update({'z':self.ffield_bbox_cfg['z']})
+
+        self.turb_bbox_cfg.update({'t':{'min':np.min(t_coord),
+                                          'max':np.max(t_coord),
+                                          'res':t_res}})
+
+
+    def _cr8_empty_tfield_ds(self):
+
+        _ , y, z, t = self._get_turbbox_coords(self.turb_bbox_cfg)
+        base_array = np.empty((len(z), len(y),len(t)))
+        self.tfield = xr.Dataset({'u': (['z', 'y', 't'], base_array),
+                                'v': (['z', 'y', 't'], base_array),
+                                'w': (['z', 'y', 't'], base_array)},
+                                coords={'t': t,
+                                        'y': y,
+                                        'z': z})
+        # Adding metadata
+        self.tfield = self._add_metadata(self.tfield, metadata,
+                                         'Turbulent flow field dataset')
+
+
+    def _upd8_tfield_ds(self, turb_df):
+
+        _ , y, z, t = self._get_turbbox_coords(self.turb_bbox_cfg)
+
+        turb_np = turb_df.to_numpy().transpose().ravel()
+        turb_np = turb_np.reshape(int(len(turb_np)/len(t)), len(t))
+
+        u = turb_np[0::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+        v = turb_np[1::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+        w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+
+
+        base_array = np.empty((len(self.tfield.z),
+                                len(self.tfield.y),
+                                len(self.tfield.t)))
+
+        self.tfield.u.values = self._pl_fill_in(base_array, u)
+        self.tfield.v.values = self._pl_fill_in(base_array, v)
+        self.tfield.w.values = self._pl_fill_in(base_array, w)
+        self.tfield.attrs['generator'] = 'PyConTurb'
+
 
     def _cr8_empty_ffield_ds(self, no_dim = 3):
         x_coord= np.arange(self.ffield_bbox_cfg['x']['min'],
@@ -204,5 +261,26 @@ class Data:
                 ds[dim].attrs = metadata.DIMS[dim]
         ds.attrs['title'] = ds_title
         return ds
+
+    @staticmethod
+    def _get_turbbox_coords(bbox_cfg):
+
+        x_coords = np.arange(bbox_cfg['x']['min'] -   bbox_cfg['x']['res'],
+                             bbox_cfg['x']['max'] + 2*bbox_cfg['x']['res'],
+                             bbox_cfg['x']['res'])
+
+        y_coords = np.arange(bbox_cfg['y']['min'] -   bbox_cfg['y']['res'],
+                             bbox_cfg['y']['max'] + 2*bbox_cfg['y']['res'],
+                             bbox_cfg['y']['res'])
+
+        z_coords = np.arange(bbox_cfg['z']['min'] -   bbox_cfg['z']['res'],
+                             bbox_cfg['z']['max'] + 2*bbox_cfg['z']['res'],
+                             bbox_cfg['z']['res'])
+
+        t_coords = np.arange(bbox_cfg['t']['min'],
+                             bbox_cfg['t']['max'],
+                             bbox_cfg['t']['res'])
+
+        return x_coords, y_coords, z_coords, t_coords
 
 data = Data()

@@ -369,3 +369,12 @@ def sliding_window_slicing(a, no_items, item_type=0):
     strides_cfg = (a.strides[0],) + a.strides
     as_strided = np.lib.stride_tricks.as_strided #shorthand
     return as_strided(a, shape=shape_cfg, strides=strides_cfg)
+
+
+def _rot_matrix(wind_dir):
+
+    azimuth = wind_dir - 90  # it is revers since something is fishy with dot product
+    azimuth = np.radians(azimuth) # converts to radians
+    c, s = np.cos(azimuth), np.sin(azimuth)
+    R = np.array([[c, s], [-s, c]])
+    return R

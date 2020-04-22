@@ -1,19 +1,23 @@
 import numpy as np
 import xarray as xr
 from .persistance import data
-from .utils import move2time, spher2cart, get_plaw_uvw, project2los, ivap_rc
+from .utils import move2time, spher2cart, get_plaw_uvw, project2los, ivap_rc, _rot_matrix
 from .samples import gen_unc
 from tqdm import tqdm
 
+# turbulence box generation tools
+from pyconturb.wind_profiles import power_profile
+from pyconturb import gen_turb, gen_spat_grid
 
 class Mocalum:
 
     def __init__(self):
         self.data = data # this is an instance of Data() from persistance.py
         self.u = None
-        self.x_res = 10
-        self.y_res = 10
-        self.z_res = 1
+        self.x_res = 25
+        self.y_res = 25
+        self.z_res = 5
+        self.turbbox_time = 600 # seconds = 10 min
 
     def set_meas_cfg(self):
         pass
@@ -40,6 +44,81 @@ class Mocalum:
         self.data._cr8_bbox_dict(x_coord, y_coord, z_coord,
                                  self.x_res, self.y_res, self.z_res, time_steps)
 
+    @staticmethod
+    def _get_bbox_pts(bbox_cfg):
+
+        bbox_pts = np.full((4,2), np.nan)
+        bbox_pts[0] = np.array([bbox_cfg['x']['min'],
+                                bbox_cfg['y']['min']])
+        bbox_pts[1] = np.array([bbox_cfg['x']['min'],
+                                bbox_cfg['y']['max']])
+        bbox_pts[2] = np.array([bbox_cfg['x']['max'],
+                                bbox_cfg['y']['max']])
+        bbox_pts[3] = np.array([bbox_cfg['x']['max'],
+                                bbox_cfg['y']['min']])
+        return bbox_pts
+
+    def _cr8_turbbbox(self):
+        wdir = self.data.fmodel_cfg['wind_from_direction']
+        ws = self.data.fmodel_cfg['wind_speed']
+        # Normalize points to be at the coordinate system center
+        bbox_pts = self._get_bbox_pts(self.data.ffield_bbox_cfg)
+        bbox_pts_norm = bbox_pts - bbox_pts.mean(axis=0)
+
+        # Find position of normalized points in future turb box coord sys
+        bbox_pts_norm_rot = bbox_pts_norm.dot(_rot_matrix(wdir))
+
+        # Calculating time
+        t_step = self.x_res / ws
+        t_coord = np.arange(0, self.turbbox_time, t_step)
+
+        self.data._cr8_tbbox_dict(bbox_pts_norm_rot[:,0],
+                                  bbox_pts_norm_rot[:,1],
+                                  t_coord,
+                                  self.x_res,
+                                  self.y_res,
+                                  t_step)
+
+
+
+    def gen_turb_ffield(self,ws=10, wdir=180, w=0, href=100, alpha=0.2):
+        """Generates flow field assuming power law
+
+        Parameters
+        ----------
+        ws : int, optional
+            wind speed, by default 10
+        wdir : int, optional
+            wind direction, by default 180
+        w : int, optional
+            vertical wind speed, by default 0
+        href : int, optional
+            reference height, by default 100
+        alpha : float, optional
+            shear expoenent, by default 0.2
+        """
+
+
+        fmodel_cfg= {'flow_model':'power_law',
+                     'wind_speed':ws,
+                     'upward_velocity':w,
+                     'wind_from_direction':wdir,
+                     'reference_height':href,
+                     'shear_expornent':alpha,
+                     }
+        self.data._cr8_fmodel_cfg(fmodel_cfg)
+        self._cr8_turbbbox()
+        self.data._cr8_empty_tfield_ds()
+
+        _, y, z, _ = self.data._get_turbbox_coords(self.data.turb_bbox_cfg)
+        spat_df = gen_spat_grid(y, z)
+
+        turb_df = gen_turb(spat_df, T=self.turbbox_time,
+                           dt=self.data.turb_bbox_cfg['t']['res'],
+                           wsp_func = power_profile,
+                           u_ref=ws, z_ref=href, alpha=alpha)
+
+        self.data._upd8_tfield_ds(turb_df)
 
 
     def set_ivap_probing(self, lidar_pos, sector_size, azimuth_mid, angular_res,
@@ -114,7 +193,6 @@ class Mocalum:
         # update flow field bounding box dict
         self._cr8_ffield_bbox()
 
-
     def gen_plaw_ffield(self,ws=10, wdir=180, w=0, href=100, alpha=0.2):
         """Generates flow field assuming power law
 
@@ -138,7 +216,7 @@ class Mocalum:
                      'upward_velocity':w,
                      'wind_from_direction':wdir,
                      'reference_height':href,
-                     'shear_expornent':alpha,
+                     'shear_exponent':alpha,
                      }
         self.data._cr8_fmodel_cfg(fmodel_cfg)
         self.data._cr8_empty_ffield_ds(no_dim)
@@ -149,6 +227,39 @@ class Mocalum:
         self.v = v
         self.data._upd8_ffield_ds(u, v, w, no_dim)
 
+    # def gen_turb_ffield(self,ws=10, wdir=180, w=0, href=100, alpha=0.2):
+    #     """Generates flow field assuming power law
+
+    #     Parameters
+    #     ----------
+    #     ws : int, optional
+    #         wind speed, by default 10
+    #     wdir : int, optional
+    #         wind direction, by default 180
+    #     w : int, optional
+    #         vertical wind speed, by default 0
+    #     href : int, optional
+    #         reference height, by default 100
+    #     alpha : float, optional
+    #         shear expoenent, by default 0.2
+    #     """
+
+    #     no_dim = 3
+    #     fmodel_cfg= {'flow_model':'power_law',
+    #                  'wind_speed':ws,
+    #                  'upward_velocity':w,
+    #                  'wind_from_direction':wdir,
+    #                  'reference_height':href,
+    #                  'shear_expornent':alpha,
+    #                  }
+    #     self.data._cr8_fmodel_cfg(fmodel_cfg)
+    #     self.data._cr8_empty_ffield_ds(no_dim)
+
+    #     hmeas = self.data.ffield.z.values
+    #     u, v, w = get_plaw_uvw(hmeas, href, ws,w, wdir, alpha)
+    #     self.u = u
+    #     self.v = v
+    #     self.data._upd8_ffield_ds(u, v, w, no_dim)
 
     def calc_los_speed(self):
         """Calcutes projection of wind speed on beam line-of-sight
