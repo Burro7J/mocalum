@@ -334,3 +334,38 @@ def inject_wind_data(ds, ds_wind):
 
     return ds
 
+
+def sliding_window_slicing(a, no_items, item_type=0):
+    """This method perfoms sliding window slicing of numpy arrays
+
+    Parameters
+    ----------
+    a : numpy
+        An array to be slided in subarrays
+    no_items : int
+        Number of sliced arrays or elements in sliced arrays
+    item_type: int
+        Indicates if no_items is number of sliced arrays (item_type=0) or
+        number of elements in sliced array (item_type=1), by default 0
+
+    Return
+    ------
+    numpy
+        Sliced numpy array
+    """
+    if item_type == 0:
+        no_slices = no_items
+        no_elements = len(a) + 1 - no_slices
+        if no_elements <=0:
+            raise ValueError('Sliding slicing not possible, no_items is larger than ' + str(len(a)))
+    else:
+        no_elements = no_items
+        no_slices = len(a) - no_elements + 1
+        if no_slices <=0:
+            raise ValueError('Sliding slicing not possible, no_items is larger than ' + str(len(a)))
+
+    subarray_shape = a.shape[1:]
+    shape_cfg = (no_slices, no_elements) + subarray_shape
+    strides_cfg = (a.strides[0],) + a.strides
+    as_strided = np.lib.stride_tricks.as_strided #shorthand
+    return as_strided(a, shape=shape_cfg, strides=strides_cfg)
