@@ -227,40 +227,6 @@ class Mocalum:
         self.v = v
         self.data._upd8_ffield_ds(u, v, w, no_dim)
 
-    # def gen_turb_ffield(self,ws=10, wdir=180, w=0, href=100, alpha=0.2):
-    #     """Generates flow field assuming power law
-
-    #     Parameters
-    #     ----------
-    #     ws : int, optional
-    #         wind speed, by default 10
-    #     wdir : int, optional
-    #         wind direction, by default 180
-    #     w : int, optional
-    #         vertical wind speed, by default 0
-    #     href : int, optional
-    #         reference height, by default 100
-    #     alpha : float, optional
-    #         shear expoenent, by default 0.2
-    #     """
-
-    #     no_dim = 3
-    #     fmodel_cfg= {'flow_model':'power_law',
-    #                  'wind_speed':ws,
-    #                  'upward_velocity':w,
-    #                  'wind_from_direction':wdir,
-    #                  'reference_height':href,
-    #                  'shear_expornent':alpha,
-    #                  }
-    #     self.data._cr8_fmodel_cfg(fmodel_cfg)
-    #     self.data._cr8_empty_ffield_ds(no_dim)
-
-    #     hmeas = self.data.ffield.z.values
-    #     u, v, w = get_plaw_uvw(hmeas, href, ws,w, wdir, alpha)
-    #     self.u = u
-    #     self.v = v
-    #     self.data._upd8_ffield_ds(u, v, w, no_dim)
-
     def calc_los_speed(self):
         """Calcutes projection of wind speed on beam line-of-sight
         """
