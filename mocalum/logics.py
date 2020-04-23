@@ -35,14 +35,45 @@ class Mocalum:
 
     def _cr8_ffield_bbox(self):
 
+        bbox_type = 0
+
+        CSR = {'x':'Absolute coordinate, coresponds to Easting in m',
+               'y':'Absolute coordinate, coresponds to Northing in m',
+               'z':'Absolute coordinate, coresponds to height above sea level in m',
+               'rot_matrix':None}
+
         x_coord= np.array([self.data.probing.x.min(), self.data.probing.x.max()])
         y_coord= np.array([self.data.probing.y.min(), self.data.probing.y.max()])
         z_coord= np.array([self.data.probing.z.min(), self.data.probing.z.max()])
-        time_steps = self.data.probing.time.values
+        t_coord = self.data.probing.time.values
+        t_res = self._calc_mean_step(t_coord)
 
         # create/updated flow field bounding box config dict
-        self.data._cr8_bbox_dict(x_coord, y_coord, z_coord,
-                                 self.x_res, self.y_res, self.z_res, time_steps)
+        self.data._cr8_bbox_dict(CSR, bbox_type,
+                                 x_coord, y_coord, z_coord, t_coord,
+                                 0,0,0,0,
+                                 self.x_res, self.y_res, self.z_res, t_res)
+
+
+    @staticmethod
+    def _calc_mean_step(a):
+        """
+        Calculates mean step between consecutive elements in 1D array
+
+        Parameters
+        ----------
+        a : numpy
+            1D array
+
+        Returns
+        -------
+        float
+            Average step between consecutive elements
+        """
+
+        a.sort()
+        steps = np.abs(np.roll(a,1) - a)[1:]
+        return steps.mean()
 
     @staticmethod
     def _get_bbox_pts(bbox_cfg):
@@ -59,25 +90,37 @@ class Mocalum:
         return bbox_pts
 
     def _cr8_turbbbox(self):
+
         wdir = self.data.fmodel_cfg['wind_from_direction']
         ws = self.data.fmodel_cfg['wind_speed']
         # Normalize points to be at the coordinate system center
         bbox_pts = self._get_bbox_pts(self.data.ffield_bbox_cfg)
-        bbox_pts_norm = bbox_pts - bbox_pts.mean(axis=0)
+        bbox_center = bbox_pts.mean(axis=0) #xy
+        bbox_pts_norm = bbox_pts - bbox_center
 
         # Find position of normalized points in future turb box coord sys
-        bbox_pts_norm_rot = bbox_pts_norm.dot(_rot_matrix(wdir))
+        tbox_pts_norm_rot = bbox_pts_norm.dot(_rot_matrix(wdir))
+        tbox_center = bbox_center.dot(_rot_matrix(wdir))
 
         # Calculating time
         t_step = self.x_res / ws
-        t_coord = np.arange(0, self.turbbox_time, t_step)
+        t_coord = np.arange(0, self.turbbox_time + t_step, t_step)
 
-        self.data._cr8_tbbox_dict(bbox_pts_norm_rot[:,0],
-                                  bbox_pts_norm_rot[:,1],
-                                  t_coord,
-                                  self.x_res,
-                                  self.y_res,
-                                  t_step)
+        # Pulling z coord from probing ds
+        z_coord = np.array([self.data.probing.z.min(), self.data.probing.z.max()])
+        bbox_type = 1
+
+        CSR = {'x':'Relative coordinate, use rot_matrix to convert to abs',
+               'y':'Relative coordinate, use rot_matrix to convert to abs',
+               'z':'Absolute coordinate, coresponds to height above sea level in m',
+               'rot_matrix':_rot_matrix(wdir)}
+
+        self.data._cr8_bbox_dict(CSR, bbox_type,
+                                 tbox_pts_norm_rot[:,0],
+                                 tbox_pts_norm_rot[:,1],
+                                 z_coord, t_coord,
+                                 tbox_center[0], tbox_center[1], 0, 0,
+                                 self.x_res, self.y_res, self.z_res, t_step)
 
 
 
@@ -113,7 +156,8 @@ class Mocalum:
         _, y, z, _ = self.data._get_turbbox_coords(self.data.turb_bbox_cfg)
         spat_df = gen_spat_grid(y, z)
 
-        turb_df = gen_turb(spat_df, T=self.turbbox_time,
+
+        turb_df = gen_turb(spat_df, T=self.turbbox_time + self.data.turb_bbox_cfg['t']['res'],
                            dt=self.data.turb_bbox_cfg['t']['res'],
                            wsp_func = power_profile,
                            u_ref=ws, z_ref=href, alpha=alpha)
@@ -282,3 +326,17 @@ class Mocalum:
         else:
 
             print('Unsupported wind reconstruction method')
+
+    def _get_prob_cords(self):
+
+        x = self.data.probing.x.values[:self.data.probing.no_los.values]
+        y = self.data.probing.y.values[:self.data.probing.no_los.values]
+
+        return np.array([x,y]).transpose()
+
+    @staticmethod
+    def _get_diagonal(ffield_bbox_cfg):
+        x_len = ffield_bbox_cfg['x']['max']-ffield_bbox_cfg['x']['min']
+        y_len = ffield_bbox_cfg['y']['max']-ffield_bbox_cfg['y']['min']
+        return ((x_len)**2+(y_len)**2)**(.5)
+

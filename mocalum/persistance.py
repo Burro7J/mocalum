@@ -31,37 +31,64 @@ class Data:
         self.fmodel_cfg = cfg
 
 
-    def _cr8_bbox_dict(self,x_coord, y_coord, z_coord,
-                          x_res, y_res, z_res, time_steps):
-        self.ffield_bbox_cfg.update({'x':{'min':np.min(x_coord),
-                                          'max':np.max(x_coord),
-                                          'res':x_res}})
+    def _cr8_bbox_dict(self, CSR, bbox_type,
+                       x_coord, y_coord, z_coord,t_coord,
+                       x_offset, y_offset, z_offset,t_offset,
+                       x_res, y_res, z_res, t_res):
 
-        self.ffield_bbox_cfg.update({'y':{'min':np.min(y_coord),
-                                          'max':np.max(y_coord),
-                                          'res':y_res}})
+        bbox_cfg = {}
 
-        self.ffield_bbox_cfg.update({'z':{'min':np.min(z_coord),
-                                          'max':np.max(z_coord),
-                                          'res':z_res}})
-        self.ffield_bbox_cfg.update({'time_steps':time_steps})
+        # info about coordinate system reference (CSR)
+        bbox_cfg.update({'CSR':{'x':CSR['x'],
+                                'y':CSR['y'],
+                                'z':CSR['z'],
+                                'rot_matrix':CSR['rot_matrix']}})
 
 
+        bbox_cfg.update({'x':{'min':np.min(x_coord),
+                              'max':np.max(x_coord),
+                              'offset':x_offset,
+                              'res':x_res}})
 
-    def _cr8_tbbox_dict(self,x_coord, y_coord, t_coord, x_res, y_res, t_res):
-        self.turb_bbox_cfg.update({'x':{'min':np.min(x_coord),
-                                          'max':np.max(x_coord),
-                                          'res':x_res}})
+        bbox_cfg.update({'y':{'min':np.min(y_coord),
+                              'max':np.max(y_coord),
+                              'offset':y_offset,
+                              'res':y_res}})
 
-        self.turb_bbox_cfg.update({'y':{'min':np.min(y_coord),
-                                          'max':np.max(y_coord),
-                                          'res':y_res}})
+        bbox_cfg.update({'z':{'min':np.min(z_coord),
+                              'max':np.max(z_coord),
+                              'offset':z_offset,
+                              'res':z_res}})
 
-        self.turb_bbox_cfg.update({'z':self.ffield_bbox_cfg['z']})
+        bbox_cfg.update({'t':{'min':np.min(t_coord),
+                              'max':np.max(t_coord),
+                              'offset':t_offset,
+                              'res':t_res}})
 
-        self.turb_bbox_cfg.update({'t':{'min':np.min(t_coord),
-                                          'max':np.max(t_coord),
-                                          'res':t_res}})
+        if bbox_type==0:
+            self.ffield_bbox_cfg = bbox_cfg
+        elif bbox_type==1:
+            self.turb_bbox_cfg = bbox_cfg
+        else:
+            print('Not implemented')
+
+
+
+
+    # def _cr8_tbbox_dict(self,x_coord, y_coord, t_coord, x_res, y_res, t_res):
+    #     self.turb_bbox_cfg.update({'x':{'min':np.min(x_coord),
+    #                                       'max':np.max(x_coord),
+    #                                       'res':x_res}})
+
+    #     self.turb_bbox_cfg.update({'y':{'min':np.min(y_coord),
+    #                                       'max':np.max(y_coord),
+    #                                       'res':y_res}})
+
+    #     self.turb_bbox_cfg.update({'z':self.ffield_bbox_cfg['z']})
+
+    #     self.turb_bbox_cfg.update({'t':{'min':np.min(t_coord),
+    #                                       'max':np.max(t_coord),
+    #                                       'res':t_res}})
 
 
     def _cr8_empty_tfield_ds(self):
@@ -278,7 +305,7 @@ class Data:
                              bbox_cfg['z']['res'])
 
         t_coords = np.arange(bbox_cfg['t']['min'],
-                             bbox_cfg['t']['max'],
+                             bbox_cfg['t']['max'] + bbox_cfg['t']['res'],
                              bbox_cfg['t']['res'])
 
         return x_coords, y_coords, z_coords, t_coords
