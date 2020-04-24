@@ -373,8 +373,56 @@ def sliding_window_slicing(a, no_items, item_type=0):
 
 def _rot_matrix(wind_dir):
 
-    azimuth = wind_dir - 90  # it is revers since something is fishy with dot product
+    azimuth = wind_dir - 90  # it is revers to permutate origina x&y axis
     azimuth = np.radians(azimuth) # converts to radians
     c, s = np.cos(azimuth), np.sin(azimuth)
     R = np.array([[c, s], [-s, c]])
     return R
+
+
+def bbox_pts_from_array(a):
+
+    bbox_pts = np.full((4,2), np.nan)
+
+    x_min = a[:,0].min()
+    y_min = a[:,1].min()
+    x_max = a[:,0].max()
+    y_max = a[:,1].max()
+    bbox_pts[0] = np.array([x_min,y_min])
+    bbox_pts[1] = np.array([x_min,y_max])
+    bbox_pts[2] = np.array([x_max,y_max])
+    bbox_pts[3] = np.array([x_max,y_min])
+
+    return bbox_pts
+
+def bbox_pts_from_cfg(cfg):
+
+    bbox_pts = np.full((4,2), np.nan)
+    bbox_pts[0] = np.array([cfg['x']['min'],
+                            cfg['y']['min']])
+    bbox_pts[1] = np.array([cfg['x']['min'],
+                            cfg['y']['max']])
+    bbox_pts[2] = np.array([cfg['x']['max'],
+                            cfg['y']['max']])
+    bbox_pts[3] = np.array([cfg['x']['max'],
+                            cfg['y']['min']])
+    return bbox_pts
+
+def calc_mean_step(a):
+    """
+    Calculates mean step between consecutive elements in 1D array
+
+    Parameters
+    ----------
+    a : numpy
+        1D array
+
+    Returns
+    -------
+    float
+        Average step between consecutive elements
+    """
+
+    a.sort()
+    steps = np.abs(np.roll(a,1) - a)[1:]
+    return steps.mean()
