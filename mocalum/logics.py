@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import inv as inv
 import xarray as xr
 from .persistance import data
 from .utils import move2time, spher2cart, get_plaw_uvw, project2los, ivap_rc, _rot_matrix
@@ -16,7 +17,6 @@ class Mocalum:
 
     def __init__(self):
         self.data = data # this is an instance of Data() from persistance.py
-        self.u = None
         self.x_res = 25
         self.y_res = 25
         self.z_res = 5
@@ -39,7 +39,8 @@ class Mocalum:
         self.data._add_xyz(x,y,z)
 
     def _cr8_ffield_bbox(self):
-        CSR = {'x':'Absolute coordinate, coresponds to Easting in m',
+        # TODO: Maybe add rot matrix which does not do anything to coordinates
+        CRS = {'x':'Absolute coordinate, coresponds to Easting in m',
                'y':'Absolute coordinate, coresponds to Northing in m',
                'z':'Absolute coordinate, coresponds to height above sea level in m',
                'rot_matrix':None}
@@ -52,7 +53,7 @@ class Mocalum:
         self.t_res = t_res
 
         # create/updated flow field bounding box config dict
-        self.data._cr8_bbox_dict(CSR,
+        self.data._cr8_bbox_dict(CRS,
                                  x_coord, y_coord, z_coord, t_coord,
                                  0,0,0,0,
                                  self.x_res, self.y_res, self.z_res, t_res)
@@ -65,7 +66,7 @@ class Mocalum:
         wdir = self.data.fmodel_cfg['wind_from_direction']
         R_az = _rot_matrix(-avg_azimuth) #2D rot_matrix
         R_tb = _rot_matrix(wdir)
-        CSR = {'x':'Relative coordinate, use inv(rot_matrix) to convert to abs',
+        CRS = {'x':'Relative coordinate, use inv(rot_matrix) to convert to abs',
                'y':'Relative coordinate, use inv(rot_matrix) to convert to abs',
                'z':'Absolute coordinate, coresponds to height above sea level',
                'rot_matrix':R_tb}
@@ -78,7 +79,7 @@ class Mocalum:
 
         # create bounding box around the beam positions while rotating
         # the bounding box points back to absolute coordinate system
-        bbox_pts = bbox_pts_from_array(beam_xy).dot(np.linalg.inv(R_az))
+        bbox_pts = bbox_pts_from_array(beam_xy).dot(inv(R_az))
 
         # reproject those points now to turbulence box coordinate system
         # in which x axis is aligned with the mean wind direction:
@@ -89,7 +90,7 @@ class Mocalum:
         self.t_res = t_res
         t_coord = np.arange(0, self.turbbox_time + t_res, t_res)
 
-        self.data._cr8_bbox_dict(CSR,
+        self.data._cr8_bbox_dict(CRS,
                                  bbox_pts[:,0], bbox_pts[:,1], beam_xyz[:,2],
                                  t_coord,
                                  0, 0, 0, 0,
@@ -226,7 +227,6 @@ class Mocalum:
             shear expoenent, by default 0.2
         """
 
-        no_dim = 3
         fmodel_cfg= {'flow_model':'power_law',
                      'wind_speed':ws,
                      'upward_velocity':w,
@@ -235,13 +235,15 @@ class Mocalum:
                      'shear_exponent':alpha,
                      }
         self.data._cr8_fmodel_cfg(fmodel_cfg)
-        self.data._cr8_empty_ffield_ds(no_dim)
 
-        hmeas = self.data.ffield.z.values
-        u, v, w = get_plaw_uvw(hmeas, href, ws,w, wdir, alpha)
-        self.u = u
-        self.v = v
-        self.data._upd8_ffield_ds(u, v, w, no_dim)
+        z_coord= np.arange(self.data.ffield_bbox_cfg['z']['min'],
+                           self.data.ffield_bbox_cfg['z']['max'],
+                           self.data.ffield_bbox_cfg['z']['res'])
+
+
+        u, v, w = get_plaw_uvw(z_coord, href, ws, w, wdir, alpha)
+
+        self.data._cr8_plfield_ds(u, v, w)
 
     def calc_los_speed(self):
         """Calcutes projection of wind speed on beam line-of-sight

@@ -4,13 +4,15 @@ the interaction of users with mocalum.
 import time
 from . import metadata
 import numpy as np
+from numpy.linalg import inv as inv
 import xarray as xr
 from tqdm import tqdm
 
 
 class Data:
     def __init__(self):
-        self.temp = None
+        self.temp_u = None
+        self.temp_v = None
         self.probing = None
         self.los = None
         self.ffield = None
@@ -29,18 +31,18 @@ class Data:
         self.fmodel_cfg = cfg
 
 
-    def _cr8_bbox_dict(self, CSR,
+    def _cr8_bbox_dict(self, CRS,
                        x_coord, y_coord, z_coord,t_coord,
                        x_offset, y_offset, z_offset,t_offset,
                        x_res, y_res, z_res, t_res):
 
         bbox_cfg = {}
 
-        # info about coordinate system reference (CSR)
-        bbox_cfg.update({'CSR':{'x':CSR['x'],
-                                'y':CSR['y'],
-                                'z':CSR['z'],
-                                'rot_matrix':CSR['rot_matrix']}})
+        # info about coordinate system reference (CRS)
+        bbox_cfg.update({'CRS':{'x':CRS['x'],
+                                'y':CRS['y'],
+                                'z':CRS['z'],
+                                'rot_matrix':CRS['rot_matrix']}})
 
 
         bbox_cfg.update({'x':{'min':np.min(x_coord),
@@ -74,9 +76,29 @@ class Data:
         turb_np = turb_df.to_numpy().transpose().ravel()
         turb_np = turb_np.reshape(int(len(turb_np)/len(t)), len(t))
 
-        u = turb_np[0::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-        v = turb_np[1::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+        self.temp_u = turb_np[0::3]
+        self.temp_v = turb_np[1::3]
+
+
+
+        # -1 to aligned properly axis
+        R_tb = -self.ffield_bbox_cfg['CRS']['rot_matrix']
+
+        # rotate u and v component to be Eastward and Northward wind
+        # according to the met conventions
+        uv = np.array([turb_np[0::3],turb_np[1::3]]).transpose()
+        tmp_shape = uv.shape
+        uv = uv.reshape(tmp_shape[0]*tmp_shape[1],2).dot(inv(R_tb)).reshape(tmp_shape)
+        uv = uv.transpose()
+
+        u = uv[0].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+        v = uv[1].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
         w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+
+        # before rotation
+        # u = turb_np[0::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+        # v = turb_np[1::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
+        # w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
 
 
         self.ffield = xr.Dataset({'u': (['z', 'y', 'time'], u),
@@ -95,13 +117,34 @@ class Data:
     def _cr8_4d_tfield_ds(self, u, v, w, x, t):
 
         self._ffield = self.ffield
+        R_tb = self.ffield_bbox_cfg['CRS']['rot_matrix']
+        y = self.ffield.y.values
+        z = self.ffield.z.values
+
+        # # make Easting, Northing coordinates:
+        # east_north = np.array([x,y]).transpose().dot(inv(R_tb))
+        # east = east_north[:,0]
+        # north = east_north[:,1]
+
+        ew = np.empty((len(x),len(y),2))
+
+
+        for i in range(0,len(x)):
+            for j in range(0,len(y)):
+                ew[i,j] = np.array([x[i],y[j]]).dot(inv(R_tb))
+
+
         self.ffield = xr.Dataset({'u': (['time', 'z', 'y', 'x'], u),
                                      'v': (['time', 'z', 'y', 'x'], v),
                                      'w': (['time', 'z', 'y', 'x'], w)},
                                 coords={'time': t,
-                                        'y': self.ffield.y.values,
-                                        'z': self.ffield.z.values,
-                                        'x': x})
+                                        'y': y,
+                                        'z': z,
+                                        'x': x,
+                                         'Easting' : (['x','y'], ew[:,:,0]),
+                                         'Northing' : (['x','y'], ew[:,:,1]),
+                                         'Height' : (['z'], z)
+                                        })
 
         self.ffield.attrs['generator'] = 'PyConTurb'
         self.ffield = self._add_metadata(self.ffield, metadata,
@@ -132,7 +175,7 @@ class Data:
         self.tfield.attrs['generator'] = 'PyConTurb'
 
 
-    def _cr8_empty_ffield_ds(self, no_dim = 3):
+    def _cr8_plfield_ds(self, u, v, w):
         x_coord= np.arange(self.ffield_bbox_cfg['x']['min'],
                            self.ffield_bbox_cfg['x']['max'],
                            self.ffield_bbox_cfg['x']['res'])
@@ -144,30 +187,29 @@ class Data:
         z_coord= np.arange(self.ffield_bbox_cfg['z']['min'],
                            self.ffield_bbox_cfg['z']['max'],
                            self.ffield_bbox_cfg['z']['res'])
-        if no_dim == 3:
 
-            base_array = np.empty((len(z_coord), len(y_coord),len(x_coord)))
-            self.ffield = xr.Dataset({'u': (['z', 'y', 'x'], base_array),
-                                    'v': (['z', 'y', 'x'], base_array),
-                                    'w': (['z', 'y', 'x'], base_array)},
-                                    coords={'x': x_coord,
-                                            'y': y_coord,
-                                            'z': z_coord})
-        elif no_dim == 4:
-            time_steps = self.ffield_bbox_cfg['time_steps']
-            base_array = np.empty((len(time_steps),
-                                   len(z_coord), len(y_coord),len(x_coord)))
-            self.ffield = xr.Dataset({'u': (['time','z', 'y', 'x'], base_array),
-                                    'v': (['time','z', 'y', 'x'], base_array),
-                                    'w': (['time','z', 'y', 'x'], base_array)},
-                                    coords={'time':time_steps,
-                                            'x': x_coord,
-                                            'y': y_coord,
-                                            'z': z_coord})
+        base_array = np.empty((len(z_coord), len(y_coord),len(x_coord)))
 
+        u = self._pl_fill_in(base_array, u)
+        v = self._pl_fill_in(base_array, v)
+        w = self._pl_fill_in(base_array, w)
+
+
+        self.ffield = xr.Dataset({'u': (['z', 'y', 'x'], u),
+                                  'v': (['z', 'y', 'x'], v),
+                                  'w': (['z', 'y', 'x'], w)},
+                                 coords={
+                                         'x': x_coord,
+                                         'y': y_coord,
+                                         'z': z_coord,
+                                         'Easting' : (['x'], x_coord),
+                                         'Northing' : (['y'], x_coord),
+                                         'Height' : (['z'], z_coord)
+                                         })
         # Adding metadata
         self.ffield = self._add_metadata(self.ffield, metadata,
                                          'Flow field dataset')
+        self.ffield.attrs['generator'] = 'power_law_model'
 
     def _upd8_ffield_ds(self, u, v, w, no_dim = 3):
 
@@ -309,9 +351,9 @@ class Data:
         for var in ds.data_vars.keys():
             if var in metadata.VARS:
                 ds[var].attrs = metadata.VARS[var]
-        for dim in ds.dims.keys():
-            if dim in metadata.DIMS:
-                ds[dim].attrs = metadata.DIMS[dim]
+        for coord in ds.coords.keys():
+            if coord in metadata.DIMS:
+                ds[coord].attrs = metadata.DIMS[coord]
         ds.attrs['title'] = ds_title
         return ds
 
