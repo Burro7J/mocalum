@@ -7,7 +7,7 @@ import matplotlib.lines as mlines
 from .utils import spher2cart, bbox_pts_from_array, bbox_pts_from_cfg
 from .logics import _rot_matrix
 import numpy as np
-
+from numpy.linalg import inv as inv
 
 
 def plot_mocalum_setup(mc_obj):
@@ -33,12 +33,10 @@ def plot_mocalum_setup(mc_obj):
 
     lidar_pos = mc_obj.data.meas_cfg['lidar_pos']
     wind_dir = mc_obj.data.fmodel_cfg['wind_from_direction']
-
-
-
+    R_tb = mc_obj.data.ffield_bbox_cfg['CRS']['rot_matrix']
 
     bbox_pts = bbox_pts_from_cfg(mc_obj.data.ffield_bbox_cfg)
-    min_bbox_pts = bbox_pts.dot(np.linalg.inv(_rot_matrix(wind_dir)))
+    min_bbox_pts = bbox_pts.dot(inv(R_tb))
     bbox_c = min_bbox_pts.mean(axis = 0)
 
 

@@ -23,6 +23,7 @@ class Mocalum:
         self.turbbox_time = 600 # seconds = 10 min
         self.t_res = None
         self.tmp_bb = None
+        self.tmp_los = None
 
     def set_meas_cfg(self):
         pass
@@ -43,11 +44,14 @@ class Mocalum:
         CRS = {'x':'Absolute coordinate, coresponds to Easting in m',
                'y':'Absolute coordinate, coresponds to Northing in m',
                'z':'Absolute coordinate, coresponds to height above sea level in m',
-               'rot_matrix':None}
+               'rot_matrix':_rot_matrix(90)}
 
-        x_coord= np.array([self.data.probing.x.min(), self.data.probing.x.max()])
-        y_coord= np.array([self.data.probing.y.min(), self.data.probing.y.max()])
-        z_coord= np.array([self.data.probing.z.min(), self.data.probing.z.max()])
+        x_coord= np.array([self.data.probing.x.min() - self.x_res,
+                           self.data.probing.x.max() + self.x_res])
+        y_coord= np.array([self.data.probing.y.min() - self.y_res,
+                           self.data.probing.y.max() + self.y_res])
+        z_coord= np.array([self.data.probing.z.min() - self.z_res,
+                           self.data.probing.z.max() + self.z_res])
         t_coord = self.data.probing.time.values
         t_res = calc_mean_step(t_coord)
         self.t_res = t_res
@@ -112,7 +116,7 @@ class Mocalum:
         alpha : float, optional
             shear expoenent, by default 0.2
         """
-        fmodel_cfg= {'flow_model':'power_law',
+        fmodel_cfg= {'flow_model':'PyConTurb',
                      'wind_speed':ws,
                      'upward_velocity':w,
                      'wind_from_direction':wdir,
@@ -254,30 +258,37 @@ class Mocalum:
             v = self.data.ffield.v.isel(x=0,y=0).interp(z=hmeas)
             w = self.data.ffield.w.isel(x=0,y=0).interp(z=hmeas)
 
-        else:
+        elif self.data.fmodel_cfg['flow_model'] == 'PyConTurb':
             # slowest possible way of pulling u,v,w
             # since it currently steps through each time stamp
             # and interpolates data
-            tme = self.data.probing.time.values
-            u = np.empty(len(tme))
-            v = np.empty(len(tme))
-            w = np.empty(len(tme))
+            time_prob = self.data.probing.time.values
+            time_tbox = self.data.ffield.time.values
+            R_tb = self.data.ffield_bbox_cfg['CRS']['rot_matrix']
 
-            for i,t in enumerate(tqdm(tme, desc='Projecting LOS')):
-                x = self.data.probing.x.sel(time = t).values
-                y = self.data.probing.y.sel(time = t).values
-                z = self.data.probing.z.sel(time = t).values
-                u[i] = self.data.ffield.u.sel(time=t).interp(x=x, y=y, z=z)
-                v[i] = self.data.ffield.v.sel(time=t).interp(x=x, y=y, z=z)
-                w[i] = self.data.ffield.w.sel(time=t).interp(x=x, y=y, z=z)
+            # Normalize time to re-feed the turbulence
+            time_norm = np.mod(time_prob, time_tbox.max())
+            u = np.empty(len(time_norm))
+            v = np.empty(len(time_norm))
+            w = np.empty(len(time_norm))
+
+            for i,t in enumerate(tqdm(time_norm, desc='Projecting LOS')):
+                x = self.data.probing.x.isel(time = i).values
+                y = self.data.probing.y.isel(time = i).values
+                z = self.data.probing.z.isel(time = i).values
+
+                xy = np.array([x,y]).dot(R_tb)
+
+                u[i] = self.data.ffield.u.interp(time=t, x=xy[0], y=xy[1], z=z).values
+                v[i] = self.data.ffield.v.interp(time=t, x=xy[0], y=xy[1], z=z).values
+                w[i] = self.data.ffield.w.interp(time=t, x=xy[0], y=xy[1], z=z).values
 
         los = project2los(u,v,w,
-                          self.data.probing.az.values +
-                          self.data.probing.unc_az.values,
-                          self.data.probing.el.values +
-                          self.data.probing.unc_el.values)
+                        self.data.probing.az.values +
+                        self.data.probing.unc_az.values,
+                        self.data.probing.el.values +
+                        self.data.probing.unc_el.values)
         los += self.data.probing.unc_est.values
-
         self.data._cr8_los_ds(los)
 
     def reconstruct_wind(self, rc_method = 'IVAP'):

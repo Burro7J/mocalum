@@ -203,7 +203,7 @@ class Data:
                                          'y': y_coord,
                                          'z': z_coord,
                                          'Easting' : (['x'], x_coord),
-                                         'Northing' : (['y'], x_coord),
+                                         'Northing' : (['y'], y_coord),
                                          'Height' : (['z'], z_coord)
                                          })
         # Adding metadata
