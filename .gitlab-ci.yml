@@ -47,7 +47,7 @@ variables:
   script:
     - cd examples
     # - jupyter-nbconvert --to notebook --execute *.ipynb
-    - pytest --nbval # other way of testing notebook which fails if there are plots!
+    - pytest --nbval-lax # other way of testing notebook which fails if there are plots!
 
 ########################################
 # Configurations and template modifiers
