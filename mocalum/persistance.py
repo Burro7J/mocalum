@@ -11,14 +11,13 @@ from tqdm import tqdm
 
 class Data:
     def __init__(self):
-        self.temp_u = None
-        self.temp_v = None
         self.probing = None
         self.los = None
         self.ffield = None
         self._ffield = None
         self.rc_wind = None
         self.fmodel_cfg = {}
+        self.lidar_cfg = {}
         self.meas_cfg = {}
         self.ffield_bbox_cfg = {}
         self.unc_cfg = {'azimuth':{'mu':0, 'std':0.1},
@@ -26,6 +25,10 @@ class Data:
                         'range':{'mu':0, 'std':10},
                         'estimation':{'mu':0, 'std':0.1},
                         'corr_coef':0}
+
+
+    def _cr8_lidar_cfg(self, cfg):
+        self.lidar_cfg = cfg
 
     def _cr8_fmodel_cfg(self, cfg):
         self.fmodel_cfg = cfg
@@ -76,10 +79,6 @@ class Data:
         turb_np = turb_df.to_numpy().transpose().ravel()
         turb_np = turb_np.reshape(int(len(turb_np)/len(t)), len(t))
 
-        self.temp_u = turb_np[0::3]
-        self.temp_v = turb_np[1::3]
-
-
 
         # -1 to aligned properly axis
         R_tb = -self.ffield_bbox_cfg['CRS']['rot_matrix']
@@ -95,7 +94,7 @@ class Data:
         v = uv[1].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
         w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
 
-        # before rotation
+        # without rotation to default coordinate system
         # u = turb_np[0::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
         # v = turb_np[1::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
         # w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
@@ -234,6 +233,26 @@ class Data:
         return full_array
 
 
+    def _upd8_meas_cfg(self, lidar_id, scan_type, az, el, rng, no_los,
+                      no_scans, scn_speed, sectrsz, rtn_tm, max_speed, max_acc):
+
+
+
+        self.meas_cfg[lidar_id]['config'].update({'scan_type':scan_type})
+        self.meas_cfg[lidar_id]['config'].update({'max_scn_speed':max_speed})
+        self.meas_cfg[lidar_id]['config'].update({'max_scn_acc':max_acc})
+        self.meas_cfg[lidar_id]['config'].update({'scn_speed':scn_speed})
+        self.meas_cfg[lidar_id]['config'].update({'no_los':no_los})
+        self.meas_cfg[lidar_id]['config'].update({'no_scans':no_scans})
+        self.meas_cfg[lidar_id]['config'].update({'sectrsz':sectrsz})
+        self.meas_cfg[lidar_id]['config'].update({'scn_tm':sectrsz*scn_speed})
+        self.meas_cfg[lidar_id]['config'].update({'rtn_tm':rtn_tm})
+        self.meas_cfg[lidar_id]['config'].update({'az':az})
+        self.meas_cfg[lidar_id]['config'].update({'el':el})
+        self.meas_cfg[lidar_id]['config'].update({'rng':rng})
+
+
+
     def _cr8_meas_cfg(self, lidar_pos, scan_type, az, el, rng, no_los,
                       no_scans, scn_speed, sectrsz, rtn_tm, max_speed, max_acc):
 
@@ -251,50 +270,64 @@ class Data:
         self.meas_cfg.update({'el':el})
         self.meas_cfg.update({'rng':rng})
 
-    def _cr8_probing_ds(self, az, el, rng, time):
+    def _cr8_probing_ds(self, lidar_id, az, el, rng, time):
         # generating empty uncertainty and xyz arrays
         unc  = np.full(az.shape, 0.0, dtype=float)
         xyz  = np.full(az.shape, np.nan, dtype=float)
 
         # pulling information from measurement config dictionary
-        s_sz = self.meas_cfg['sectrsz'] if 'sectrsz' in self.meas_cfg else None
-        n_scn = self.meas_cfg['no_scans'] if 'no_scans' in self.meas_cfg else None
-        no_los = self.meas_cfg['no_los'] if 'no_los' in self.meas_cfg else None
-        s_tm = self.meas_cfg['scan_tm'] if 'scan_tm' in self.meas_cfg else None
-        r_tm = self.meas_cfg['return_tm'] if 'return_tm' in self.meas_cfg else None
-        lidar_pos = self.meas_cfg['lidar_pos'] if 'lidar_pos' in self.meas_cfg else None
+        s_sz = (self.meas_cfg[lidar_id]['config']['sectrsz']
+                if 'sectrsz' in self.meas_cfg[lidar_id]['config'] else None)
+        n_scn = (self.meas_cfg[lidar_id]['config']['no_scans']
+                if 'no_scans' in self.meas_cfg[lidar_id]['config'] else None)
+        no_los = (self.meas_cfg[lidar_id]['config']['no_los']
+                if 'no_los' in self.meas_cfg[lidar_id]['config'] else None)
+        s_tm = (self.meas_cfg[lidar_id]['config']['scn_tm']
+                if 'scn_tm' in self.meas_cfg[lidar_id]['config'] else None)
+        r_tm = (self.meas_cfg[lidar_id]['config']['rtn_tm']
+                if 'rtn_tm' in self.meas_cfg[lidar_id]['config'] else None)
+        lidar_pos = (self.meas_cfg[lidar_id]['position']
+                if 'position' in self.meas_cfg[lidar_id] else None)
 
-        self.probing = xr.Dataset({'az': (['time'], az),
-                                   'el': (['time'], el),
-                                   'rng': (['time'], rng),
-                                   'x': (['time'], xyz),
-                                   'y': (['time'], xyz),
-                                   'z': (['time'], xyz),
-                                   'unc_az': (['time'],  unc),
-                                   'unc_el': (['time'],  unc),
-                                   'unc_rng': (['time'], unc),
-                                   'unc_est': (['time'], unc),
-                                   'sectrsz':(s_sz),
-                                   'no_scans':(n_scn),
-                                   'no_los':(no_los),
-                                   'scan_tm':(s_tm),
-                                   'return_tm':(r_tm),
-                                   'lidar_pos_x':(lidar_pos[0]),
-                                   'lidar_pos_y':(lidar_pos[1]),
-                                   'lidar_pos_z':(lidar_pos[2]),
-                                   },coords={'time': time})
+
+        probing_ds = xr.Dataset({'az': (['lidar_id','time'], np.array([az])),
+                                   'el': (['lidar_id','time'], np.array([el])),
+                                   'rng': (['lidar_id','time'], np.array([rng])),
+                                   'x': (['lidar_id','time'], np.array([xyz])),
+                                   'y': (['lidar_id','time'], np.array([xyz])),
+                                   'z': (['lidar_id','time'], np.array([xyz])),
+                                   'unc_az': (['lidar_id','time'], np.array([unc])),
+                                   'unc_el': (['lidar_id','time'], np.array([unc])),
+                                   'unc_rng': (['lidar_id','time'], np.array([unc])),
+                                   'unc_est': (['lidar_id','time'], np.array([unc])),
+                                   'sectrsz':(['lidar_id'],np.array([s_sz])),
+                                   'no_scans':(['lidar_id'],np.array([n_scn])),
+                                   'no_los':(['lidar_id'],np.array([no_los])),
+                                   'scan_tm':(['lidar_id'],np.array([s_tm])),
+                                   'return_tm':(['lidar_id'],np.array([r_tm])),
+                                   'lidar_pos_x':(['lidar_id'],np.array([lidar_pos[0]])),
+                                   'lidar_pos_y':(['lidar_id'],np.array([lidar_pos[1]])),
+                                   'lidar_pos_z':(['lidar_id'],np.array([lidar_pos[2]])),
+                                   },coords={'time': time,
+                                             'lidar_id':np.array([lidar_id])})
 
         # adding/updating metadata
-        self.probing = self._add_metadata(self.probing, metadata,
+        probing_ds = self._add_metadata(probing_ds, metadata,
                                      'Lidar atmosphere probing dataset')
+
+        if self.probing != None:
+            self.probing = self.probing.merge(probing_ds)
+        else:
+            self.probing = probing_ds
+
 
     def _add_unc(self, unc_term, samples):
         self.probing[unc_term].values  = samples
 
-    def _add_xyz(self, x, y, z):
-        self.probing.x.values = x.values
-        self.probing.y.values = y.values
-        self.probing.z.values = z.values
+    def _add_xyz(self, lidar_id, x, y, z):
+        self.probing.sel(lidar_id = lidar_id).x.values = x.values
+        self.probing.sel(lidar_id = lidar_id).y.values = y.values
+        self.probing.sel(lidar_id = lidar_id).z.values = z.values
 
     def _cr8_los_ds(self, los):
         # TODO: detect what type of measurements it is (PPI, RHI, etc.)

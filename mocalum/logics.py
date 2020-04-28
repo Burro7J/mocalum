@@ -4,7 +4,7 @@ import xarray as xr
 from .persistance import data
 from .utils import move2time, spher2cart, get_plaw_uvw, project2los, ivap_rc, _rot_matrix
 from .utils import sliding_window_slicing, bbox_pts_from_array, bbox_pts_from_cfg
-from .utils import calc_mean_step
+from .utils import calc_mean_step, safe_execute
 from .samples import gen_unc
 from tqdm import tqdm
 
@@ -25,19 +25,125 @@ class Mocalum:
         self.tmp_bb = None
         self.tmp_los = None
 
-    def set_meas_cfg(self):
-        pass
+    @staticmethod
+    def _is_lidar_pos(lidar_pos):
+        """
+        Validates if the lidar position is according to definition
 
-    def _calc_xyz(self):
-        x,y,z = spher2cart(self.data.probing.az  + self.data.probing.unc_az,
-                           self.data.probing.el  + self.data.probing.unc_el,
-                           self.data.probing.rng + self.data.probing.unc_rng)
+        Parameters
+        ----------
+        lidar_pos : ndarray
+            nD array containing data with `float` or `int` type
+            corresponding to x, y and z coordinates of a lidar.
+            nD array data are expressed in meters.
 
-        x.values+=self.data.meas_cfg['lidar_pos'][0]
-        y.values+=self.data.meas_cfg['lidar_pos'][1]
-        z.values+=self.data.meas_cfg['lidar_pos'][2]
+        Returns
+        -------
+            True / False
+        """
 
-        self.data._add_xyz(x,y,z)
+        rules = [True, True, True]
+
+        exec("try: rules[0] = type(lidar_pos).__module__ == np.__name__\nexcept: rules[0]=False")
+        exec("try: rules[1] = len(lidar_pos.shape) == 1\nexcept: rules[1]=False")
+        exec("try: rules[1] = lidar_pos.shape[0] == 3\nexcept: rules[2]=False")
+
+
+        messages = ["Not numpy array",
+                    "Lidar position must be one dimensional numpy array",
+                    "Lidar position array must contain three elements"]
+        if all(rules):
+            return True
+        else:
+            for i, rule in enumerate(rules):
+                if rule == False:
+                    print(messages[i])
+            return False
+
+    def add_lidar(self, id, lidar_pos, **kwargs):
+        """Adds a lidar instance to the measurement config
+
+        Lidars can be add one at time. Currently only the instrument position
+        in UTM coordinate system is supported.
+
+        Parameters
+        ----------
+        instrument_id : str, required
+            String which identifies instrument in the instrument dictionary.
+        lidar_pos : numpy, required
+            1D array containing data with `float` or `int` type corresponding
+            to Northing, Easting and Height coordinates of the instrument.
+            1D array data are expressed in meters.
+
+        Other Parameters
+        -----------------
+        u_estimation : float, optional
+            Uncertainty in estimating radial velocity from Doppler spectra.
+            Unless provided, (default) value is set to 0.1 m/s.
+        u_range : float, optional
+            Uncertainty in detecting range at which atmosphere is probed.
+            Unless provided, (default) value is set to 1 m.
+        u_azimuth : float, optional
+            Uncertainty in the beam steering for the azimuth angle.
+            Unless provided, (default) value is set to 0.1 deg.
+        u_elevation : float, optional
+            Uncertainty in the beam steering for the elevation angle.
+            Unless provided, (default) value is set to 0.1 deg.
+        corr_coef : float, optional
+            Correlation coffecient of inputs
+            Default 0, uncorrelated inputs
+            Max 1, 100% correlated inputs
+
+        Raises
+        ------
+        InappropriatePosition
+            If the provided position of instrument is not properly provided.
+
+
+        """
+        if not(self._is_lidar_pos(lidar_pos)):
+            raise ValueError("Lidar position is not properly provided")
+
+
+        unc_elements = ['u_estimation', 'u_azimuth','u_elevation',
+                        'u_range', 'corr_coef']
+
+        lidar_dict = {id:{'position': lidar_pos,
+                          'uncertainty':{
+                              'u_azimuth':{'mu':0,'std':0.1,'units':'deg'},
+                              'u_elevation':{'mu':0, 'std':0.1, 'units':'deg'},
+                              'u_range':{'mu':0, 'std':0.1, 'units':'m'},
+                              'u_estimation':{'mu':0, 'std':0.1, 'units':'m.s^-1'},
+                              'corr_coef':0},
+                          'config': {},
+                                        }
+                        }
+
+        if kwargs != None:
+            for element in unc_elements:
+                if element in kwargs:
+                    lidar_dict['uncertainty']['element'] = kwargs['element']
+
+
+        self.data.meas_cfg.update(lidar_dict)
+
+        # if self.verbos:
+        #     print('Instrument \'' + instrument_id + '\' of category \'' +
+        #         category +'\' added to the instrument dictionary, ' +
+        #         'which now contains ' + str(len(self.instruments)) +
+        #         ' instrument(s).')
+
+    def _calc_xyz(self, lidar_id):
+        probing_ds = self.data.probing.sel(lidar_id = lidar_id)
+        x,y,z = spher2cart(probing_ds.az  + probing_ds.unc_az,
+                           probing_ds.el  + probing_ds.unc_el,
+                           probing_ds.rng  + probing_ds.unc_rng)
+
+        x.values+=self.data.meas_cfg[lidar_id]['position'][0]
+        y.values+=self.data.meas_cfg[lidar_id]['position'][1]
+        z.values+=self.data.meas_cfg[lidar_id]['position'][2]
+        self.x = x
+        self.data._add_xyz(lidar_id,x,y,z)
 
     def _cr8_ffield_bbox(self):
         # TODO: Maybe add rot matrix which does not do anything to coordinates
@@ -142,7 +248,7 @@ class Mocalum:
         self._to_4D_ds()
 
 
-    def set_ivap_probing(self, lidar_pos, sector_size, azimuth_mid, angular_res,
+    def set_ivap_probing(self, lidar_id, sector_size, azimuth_mid, angular_res,
                          elevation, rng, no_scans = 1,
                          scan_speed=1, max_speed=50, max_acc=100):
 
@@ -163,8 +269,10 @@ class Mocalum:
         sweep_time = move2time(sector_size, max_acc, max_speed)
         scan_time = sector_size*scan_speed
 
+        # lidar_pos = self.data.meas_cfg[lidar_id]['position']
+
         # create measurement configuration dictionary
-        self.data._cr8_meas_cfg(lidar_pos, 'IVAP', az, el, rng, no_los, no_scans,
+        self.data._upd8_meas_cfg(lidar_id, 'IVAP', az, el, rng, no_los, no_scans,
                                 scan_speed, sector_size, sweep_time,
                                 max_speed, max_acc)
 
@@ -182,15 +290,36 @@ class Mocalum:
         time = time + multip*to_add
 
         # create probing dataset later to be populated with probing unc
-        self.data._cr8_probing_ds(az, el, rng, time)
+        self.data._cr8_probing_ds(lidar_id, az, el, rng, time)
+
+        # calculate uncertainties
 
         # adding xyz (these will not have uncertainties)
+        self._calc_xyz(lidar_id)
+
+        # # create flow field bounding box dict
+        # self._cr8_ffield_bbox()
+
+    def _gen_unc_contributors(self, lidar_id):
+
+
+
+        # sample uncertainty contribution considering normal distribution
+        # and add them to probing xr.DataSet
+        for unc_term, cfg in unc_cfg.items():
+            samples = gen_unc(np.full(self.data.meas_cfg['no_los'], cfg['mu']),
+                              np.full(self.data.meas_cfg['no_los'], cfg['std']),
+                              corr_coef, self.data.meas_cfg['no_scans'])
+            self.data._add_unc(unc_term, samples.flatten())
+
+        # update x,y,z coordinates of measurement points
         self._calc_xyz()
 
-        # create flow field bounding box dict
+        # update flow field bounding box dict
         self._cr8_ffield_bbox()
 
-    def gen_unc_contributors(self, corr_coef=0,
+
+    def gen_unc_contributors_old(self, corr_coef=0,
                              unc_cfg={'unc_az':{'mu':0, 'std':0.1},
                                       'unc_el':{'mu':0, 'std':0.1},
                                       'unc_rng':{'mu':0, 'std':10},

@@ -426,3 +426,13 @@ def calc_mean_step(a):
     a.sort()
     steps = np.abs(np.roll(a,1) - a)[1:]
     return steps.mean()
+
+
+def safe_execute(default, exception, function, *args):
+    """
+    from: https://stackoverflow.com/questions/36671077/one-line-exception-handling
+    """
+    try:
+        return function(*args)
+    except exception:
+        return default
