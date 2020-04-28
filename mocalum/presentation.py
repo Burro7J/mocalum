@@ -10,7 +10,7 @@ import numpy as np
 from numpy.linalg import inv as inv
 
 
-def plot_mocalum_setup(mc_obj):
+def plot_mocalum_setup(lidar_id, bbox_id, mc_obj):
     """
     Plots 2D geometry of lidar scan and flow field box
 
@@ -19,11 +19,11 @@ def plot_mocalum_setup(mc_obj):
     mc_obj : mocalum
         Instance of mocalum class
     """
-    avg_azimuth = mc_obj.data.meas_cfg['az'].mean()
-    no_los = mc_obj.data.meas_cfg['no_los']
-    arc_cords= mc_obj._get_prob_cords()[:no_los]
+    avg_azimuth = mc_obj.data.meas_cfg[lidar_id]['config']['az'].mean()
+    no_los = mc_obj.data.meas_cfg[lidar_id]['config']['no_los']
+    arc_cords= mc_obj._get_prob_cords(lidar_id)[:no_los]
 
-    arc_bbox = bbox_pts_from_array(mc_obj._get_prob_cords()[:,(0,1)].dot(_rot_matrix(avg_azimuth)))
+    arc_bbox = bbox_pts_from_array(mc_obj._get_prob_cords(lidar_id)[:,(0,1)].dot(_rot_matrix(avg_azimuth)))
     arc_bbox = arc_bbox.dot(np.linalg.inv(_rot_matrix(avg_azimuth)))
 
     x_len = arc_bbox[:,0].max()-arc_bbox[:,0].min()
@@ -31,11 +31,11 @@ def plot_mocalum_setup(mc_obj):
     diagonal = ((x_len)**2+(y_len)**2)**(.5)
 
 
-    lidar_pos = mc_obj.data.meas_cfg['lidar_pos']
+    lidar_pos = mc_obj.data.meas_cfg[lidar_id]['position']
     wind_dir = mc_obj.data.fmodel_cfg['wind_from_direction']
-    R_tb = mc_obj.data.ffield_bbox_cfg['CRS']['rot_matrix']
+    R_tb = mc_obj.data.ffield_bbox_cfg[bbox_id]['CRS']['rot_matrix']
 
-    bbox_pts = bbox_pts_from_cfg(mc_obj.data.ffield_bbox_cfg)
+    bbox_pts = bbox_pts_from_cfg(mc_obj.data.ffield_bbox_cfg[bbox_id])
     min_bbox_pts = bbox_pts.dot(inv(R_tb))
     bbox_c = min_bbox_pts.mean(axis = 0)
 

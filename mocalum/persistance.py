@@ -63,16 +63,16 @@ class Data:
 
 
 
-    def _cr8_3d_tfield_ds(self, turb_df):
+    def _cr8_3d_tfield_ds(self, id, turb_df):
 
-        _ , y, z, t = self._get_ffield_coords()
+        _ , y, z, t = self._get_ffield_coords(id)
 
         turb_np = turb_df.to_numpy().transpose().ravel()
         turb_np = turb_np.reshape(int(len(turb_np)/len(t)), len(t))
 
 
         # -1 to aligned properly axis
-        R_tb = -self.ffield_bbox_cfg['CRS']['rot_matrix']
+        R_tb = -self.ffield_bbox_cfg[id]['CRS']['rot_matrix']
 
         # rotate u and v component to be Eastward and Northward wind
         # according to the met conventions
@@ -104,10 +104,10 @@ class Data:
                                          'Turbulent flow field dataset')
         self.ffield.attrs['generator'] = 'PyConTurb'
 
-    def _cr8_4d_tfield_ds(self, u, v, w, x, t):
+    def _cr8_4d_tfield_ds(self, id, u, v, w, x, t):
 
         self._ffield = self.ffield
-        R_tb = self.ffield_bbox_cfg['CRS']['rot_matrix']
+        R_tb = self.ffield_bbox_cfg[id]['CRS']['rot_matrix']
         y = self.ffield.y.values
         z = self.ffield.z.values
 
@@ -165,25 +165,79 @@ class Data:
         self.tfield.attrs['generator'] = 'PyConTurb'
 
 
-    def _cr8_plfield_ds(self, u, v, w):
-        x_coord= np.arange(self.ffield_bbox_cfg['x']['min'],
-                           self.ffield_bbox_cfg['x']['max'],
-                           self.ffield_bbox_cfg['x']['res'])
+    def _cr8_plfield_ds(self, lidar_id, u, v, w):
 
-        y_coord= np.arange(self.ffield_bbox_cfg['y']['min'],
-                           self.ffield_bbox_cfg['y']['max'],
-                           self.ffield_bbox_cfg['y']['res'])
+        if type(lidar_id) == str:
+            x_coord= np.arange(self.ffield_bbox_cfg[lidar_id]['x']['min'],
+                            self.ffield_bbox_cfg[lidar_id]['x']['max'],
+                            self.ffield_bbox_cfg[lidar_id]['x']['res'])
 
-        z_coord= np.arange(self.ffield_bbox_cfg['z']['min'],
-                           self.ffield_bbox_cfg['z']['max'],
-                           self.ffield_bbox_cfg['z']['res'])
+            y_coord= np.arange(self.ffield_bbox_cfg[lidar_id]['y']['min'],
+                            self.ffield_bbox_cfg[lidar_id]['y']['max'],
+                            self.ffield_bbox_cfg[lidar_id]['y']['res'])
+
+            z_coord= np.arange(self.ffield_bbox_cfg[lidar_id]['z']['min'],
+                            self.ffield_bbox_cfg[lidar_id]['z']['max'],
+                            self.ffield_bbox_cfg[lidar_id]['z']['res'])
+
+
+        elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
+            z_min = np.empty(len(lidar_id))
+            z_max = np.empty(len(lidar_id))
+            z_res = np.empty(len(lidar_id))
+            x_min = np.empty(len(lidar_id))
+            x_max = np.empty(len(lidar_id))
+            x_res = np.empty(len(lidar_id))
+            y_min = np.empty(len(lidar_id))
+            y_max = np.empty(len(lidar_id))
+            y_res = np.empty(len(lidar_id))
+            for i,id in enumerate(lidar_id):
+                z_max[i]= self.ffield_bbox_cfg[id]['z']['max']
+                z_min[i]= self.ffield_bbox_cfg[id]['z']['min']
+                z_res[i]= self.ffield_bbox_cfg[id]['z']['res']
+
+                x_max[i]= self.ffield_bbox_cfg[id]['x']['max']
+                x_min[i]= self.ffield_bbox_cfg[id]['x']['min']
+                x_res[i]= self.ffield_bbox_cfg[id]['x']['res']
+
+                y_max[i]= self.ffield_bbox_cfg[id]['y']['max']
+                y_min[i]= self.ffield_bbox_cfg[id]['y']['min']
+                y_res[i]= self.ffield_bbox_cfg[id]['y']['res']
+
+            z_coord = np.arange(z_min.min() - z_res.min(),
+                                z_max.max() + z_res.min(), z_res.min())
+            x_coord = np.arange(x_min.min() - x_res.min(),
+                                 x_max.max() + x_res.min(), x_res.min())
+            y_coord = np.arange(y_min.min() - y_res.min(),
+                                 y_max.max() + y_res.min(), y_res.min())
+
+
+        # t_max = self.probing[lidar_id].time.max()
+        # t_min = self.probing[lidar_id].time.min()
+        # t_coord = np.linspace(t_min, t_max,100)
+        # base_array = np.empty((len(z_coord), len(y_coord),
+        #                        len(x_coord),len(t_coord)))
+
+        # u = self._pl_fill_in(base_array, u)
+        # v = self._pl_fill_in(base_array, v)
+        # w = self._pl_fill_in(base_array, w)
+
+
+        # self.ffield = xr.Dataset({'u': (['z', 'y', 'x','t'], u),
+        #                           'v': (['z', 'y', 'x','t'], v),
+        #                           'w': (['z', 'y', 'x','t'], w)},
+        #                          coords={
+        #                                  'x': x_coord,
+        #                                  'y': y_coord,
+        #                                  'z': z_coord,
+        #                                  't':t_coord,
+        #                                  })
 
         base_array = np.empty((len(z_coord), len(y_coord),len(x_coord)))
 
         u = self._pl_fill_in(base_array, u)
         v = self._pl_fill_in(base_array, v)
         w = self._pl_fill_in(base_array, w)
-
 
         self.ffield = xr.Dataset({'u': (['z', 'y', 'x'], u),
                                   'v': (['z', 'y', 'x'], v),
@@ -201,19 +255,6 @@ class Data:
                                          'Flow field dataset')
         self.ffield.attrs['generator'] = 'power_law_model'
 
-    def _upd8_ffield_ds(self, u, v, w, no_dim = 3):
-
-        if no_dim == 3:
-            # create base array
-            base_array = np.empty((len(self.ffield.z),
-                                   len(self.ffield.y),
-                                   len(self.ffield.x)))
-
-
-            self.ffield.u.values = self._pl_fill_in(base_array, u)
-            self.ffield.v.values = self._pl_fill_in(base_array, v)
-            self.ffield.w.values = self._pl_fill_in(base_array, w)
-            self.ffield.attrs['generator'] = 'power_law_model'
 
     @staticmethod
     def _pl_fill_in(empty_array, values):
@@ -347,8 +388,8 @@ class Data:
                                       'Reconstructed wind')
         self.rc_wind.attrs['scan_type'] = self.meas_cfg['scan_type']
 
-    def _get_ffield_coords(self):
-        bbox_cfg=self.ffield_bbox_cfg
+    def _get_ffield_coords(self, id):
+        bbox_cfg=self.ffield_bbox_cfg[id]
 
         x_coords = np.arange(bbox_cfg['x']['min'] -   bbox_cfg['x']['res'],
                              bbox_cfg['x']['max'] + 2*bbox_cfg['x']['res'],

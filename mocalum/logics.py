@@ -112,7 +112,7 @@ class Mocalum:
                           'uncertainty':{
                               'unc_az':{'mu':0,'std':0.1,'units':'deg'},
                               'unc_el':{'mu':0, 'std':0.1, 'units':'deg'},
-                              'unc_rng':{'mu':0, 'std':0.1, 'units':'m'},
+                              'unc_rng':{'mu':0, 'std':10, 'units':'m'},
                               'unc_est':{'mu':0, 'std':0.1, 'units':'m.s^-1'},
                               'corr_coef':0},
                           'config': {},
@@ -170,8 +170,32 @@ class Mocalum:
 
 
 
-    def _cr8_turbbbox(self):
-        avg_azimuth = self.data.meas_cfg['az'].mean()
+    def _cr8_turbbbox(self, lidar_id):
+        # needs to find an average azimuth between n lidar
+        try:
+            if type(lidar_id) == str:
+                avg_azimuth = self.data.meas_cfg[lidar_id]['config']['az'].mean()
+                beam_xyz = self._get_prob_cords(lidar_id)
+                name_bbox = 'turb_for_' + lidar_id
+
+            elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
+                name_bbox = 'turb_for_'
+                for i, id in enumerate(lidar_id):
+                    if i == 0:
+                        beam_xyz =self._get_prob_cords(id)
+                        aa = self.data.meas_cfg[id]['config']['az'].mean()
+                        name_bbox += id
+                    else:
+                        name_bbox += '_and_'
+                        name_bbox += id
+                        beam_xyz = np.append(beam_xyz,
+                                             self._get_prob_cords(id),
+                                             axis = 0)
+                        aa = np.append(aa, self.data.meas_cfg[id]['config']['az'].mean())
+                avg_azimuth = aa.mean()
+        except:
+            raise ValueError('lidar id(s) does not exist !')
+
         ws = self.data.fmodel_cfg['wind_speed']
         wdir = self.data.fmodel_cfg['wind_from_direction']
         R_az = _rot_matrix(-avg_azimuth) #2D rot_matrix
@@ -181,7 +205,7 @@ class Mocalum:
                'z':'Absolute coordinate, coresponds to height above sea level',
                'rot_matrix':R_tb}
         # get probing coordinates
-        beam_xyz = self._get_prob_cords()
+        # beam_xyz = self._get_prob_cords()
 
         # reproject probing coordinates to coordinate system where
         # y axis is aligned with the mean azimuth direction
@@ -200,13 +224,15 @@ class Mocalum:
         self.t_res = t_res
         t_coord = np.arange(0, self.turbbox_time + t_res, t_res)
 
-        self.data._cr8_bbox_dict(CRS,
+        self.data._cr8_bbox_dict(name_bbox, CRS,
                                  bbox_pts[:,0], bbox_pts[:,1], beam_xyz[:,2],
                                  t_coord,
                                  0, 0, 0, 0,
                                  self.x_res, self.y_res, self.z_res, t_res)
+        return name_bbox
 
-    def gen_turb_ffield(self,ws=10, wdir=180, w=0, href=100, alpha=0.2):
+    def gen_turb_ffield(self,lidar_id,
+                        ws=10, wdir=180, w=0, href=100, alpha=0.2):
         """Generates flow field assuming power law
 
         Parameters
@@ -230,22 +256,24 @@ class Mocalum:
                      'shear_expornent':alpha,
                      }
         self.data._cr8_fmodel_cfg(fmodel_cfg)
-        self._cr8_turbbbox()
+        name_bbox = self._cr8_turbbbox(lidar_id)
         # self.data._cr8_empty_tfield_ds()
 
-        _, y, z, _ = self.data._get_ffield_coords()
+        _, y, z, _ = self.data._get_ffield_coords(name_bbox)
         spat_df = gen_spat_grid(y, z)
+        T_tot = self.turbbox_time
+        T_res = self.data.ffield_bbox_cfg[name_bbox]['t']['res']
 
 
-        turb_df = gen_turb(spat_df, T=self.turbbox_time + self.data.ffield_bbox_cfg['t']['res'],
-                           dt=self.data.ffield_bbox_cfg['t']['res'],
+        turb_df = gen_turb(spat_df, T=T_tot + T_res,
+                           dt=T_res,
                            wsp_func = power_profile,
                            u_ref=ws, z_ref=href, alpha=alpha)
 
-        self.data._cr8_3d_tfield_ds(turb_df)
+        self.data._cr8_3d_tfield_ds(name_bbox, turb_df)
 
         # self.data._upd8_tfield_ds(turb_df)
-        self._to_4D_ds()
+        self._to_4D_ds(name_bbox)
 
 
     def set_ivap_probing(self, lidar_id, sector_size, azimuth_mid, angular_res,
@@ -328,34 +356,35 @@ class Mocalum:
         self._calc_xyz(lidar_id)
 
         # # update flow field bounding box dict
-        # self._cr8_ffield_bbox()
+        self._cr8_ffield_bbox(lidar_id)
 
 
-    def gen_unc_contributors_old(self, corr_coef=0,
-                             unc_cfg={'unc_az':{'mu':0, 'std':0.1},
-                                      'unc_el':{'mu':0, 'std':0.1},
-                                      'unc_rng':{'mu':0, 'std':10},
-                                      'unc_est':{'mu':0, 'std':0.1}}):
+    # def gen_unc_contributors_old(self, corr_coef=0,
+    #                          unc_cfg={'unc_az':{'mu':0, 'std':0.1},
+    #                                   'unc_el':{'mu':0, 'std':0.1},
+    #                                   'unc_rng':{'mu':0, 'std':10},
+    #                                   'unc_est':{'mu':0, 'std':0.1}}):
 
-        # store information in unc_cfg
-        self.data.unc_cfg.update(unc_cfg)
-        self.data.unc_cfg.update({'corr_coef':corr_coef})
+    #     # store information in unc_cfg
+    #     self.data.unc_cfg.update(unc_cfg)
+    #     self.data.unc_cfg.update({'corr_coef':corr_coef})
 
-        # sample uncertainty contribution considering normal distribution
-        # and add them to probing xr.DataSet
-        for unc_term, cfg in unc_cfg.items():
-            samples = gen_unc(np.full(self.data.meas_cfg['no_los'], cfg['mu']),
-                              np.full(self.data.meas_cfg['no_los'], cfg['std']),
-                              corr_coef, self.data.meas_cfg['no_scans'])
-            self.data._add_unc(unc_term, samples.flatten())
+    #     # sample uncertainty contribution considering normal distribution
+    #     # and add them to probing xr.DataSet
+    #     for unc_term, cfg in unc_cfg.items():
+    #         samples = gen_unc(np.full(self.data.meas_cfg['no_los'], cfg['mu']),
+    #                           np.full(self.data.meas_cfg['no_los'], cfg['std']),
+    #                           corr_coef, self.data.meas_cfg['no_scans'])
+    #         self.data._add_unc(unc_term, samples.flatten())
 
-        # update x,y,z coordinates of measurement points
-        self._calc_xyz()
+    #     # update x,y,z coordinates of measurement points
+    #     self._calc_xyz()
 
-        # update flow field bounding box dict
-        self._cr8_ffield_bbox()
+    #     # update flow field bounding box dict
+    #     self._cr8_ffield_bbox()
 
-    def gen_plaw_ffield(self,ws=10, wdir=180, w=0, href=100, alpha=0.2):
+    def gen_plaw_ffield(self,lidar_id,
+                        ws=10, wdir=180, w=0, href=100, alpha=0.2):
         """Generates flow field assuming power law
 
         Parameters
@@ -381,18 +410,40 @@ class Mocalum:
                      }
         self.data._cr8_fmodel_cfg(fmodel_cfg)
 
-        z_coord= np.arange(self.data.ffield_bbox_cfg['z']['min'],
-                           self.data.ffield_bbox_cfg['z']['max'],
-                           self.data.ffield_bbox_cfg['z']['res'])
+
+        try:
+            if type(lidar_id) == str:
+                z_coord= np.arange(self.data.ffield_bbox_cfg[lidar_id]['z']['min'],
+                                   self.data.ffield_bbox_cfg[lidar_id]['z']['max'],
+                                   self.data.ffield_bbox_cfg[lidar_id]['z']['res'])
+            elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
+                z_min = np.empty(len(lidar_id))
+                z_max = np.empty(len(lidar_id))
+                z_res = np.empty(len(lidar_id))
+                for i,id in enumerate(lidar_id):
+                    z_min[i]= self.data.ffield_bbox_cfg[id]['z']['min']
+                    z_max[i]= self.data.ffield_bbox_cfg[id]['z']['max']
+                    z_res[i]= self.data.ffield_bbox_cfg[id]['z']['res']
+
+                z_coord = np.arange(z_min.min() - z_res.min(),
+                                    z_max.max() + z_res.min(), z_res.min())
+        except:
+            raise ValueError('lidar id(s) does not exist !')
+
+
 
 
         u, v, w = get_plaw_uvw(z_coord, href, ws, w, wdir, alpha)
 
-        self.data._cr8_plfield_ds(u, v, w)
+        self.data._cr8_plfield_ds(lidar_id, u, v, w)
 
-    def calc_los_speed(self):
+    def calc_los_speed(self, lidar_id):
         """Calcutes projection of wind speed on beam line-of-sight
         """
+
+        # needs if lidars exist before proceeding forward
+
+
         if self.data.fmodel_cfg['flow_model'] == 'power_law':
             hmeas = self.data.probing.z.values
             u = self.data.ffield.u.isel(x=0,y=0).interp(z=hmeas)
@@ -405,7 +456,7 @@ class Mocalum:
             # and interpolates data
             time_prob = self.data.probing.time.values
             time_tbox = self.data.ffield.time.values
-            R_tb = self.data.ffield_bbox_cfg['CRS']['rot_matrix']
+            R_tb = self.data.ffield_bbox_cfg['lidar']['CRS']['rot_matrix']
 
             # Normalize time to re-feed the turbulence
             time_norm = np.mod(time_prob, time_tbox.max())
@@ -452,18 +503,18 @@ class Mocalum:
         else:
             print('Unsupported wind reconstruction method')
 
-    def _get_prob_cords(self):
+    def _get_prob_cords(self,lidar_id):
 
-        x = self.data.probing.x.values
-        y = self.data.probing.y.values
-        z = self.data.probing.z.values
+        x = self.data.probing[lidar_id].x.values
+        y = self.data.probing[lidar_id].y.values
+        z = self.data.probing[lidar_id].z.values
 
         return np.array([x,y,z]).transpose()
 
 
-    def _to_4D_ds(self):
+    def _to_4D_ds(self, id):
         ws = self.data.fmodel_cfg['wind_speed']
-        bbox_pts = bbox_pts_from_cfg(self.data.ffield_bbox_cfg)
+        bbox_pts = bbox_pts_from_cfg(self.data.ffield_bbox_cfg[id])
 
         x_start_pos = bbox_pts[:,0].min()
         x_len = abs(bbox_pts[:,0].max() - bbox_pts[:,0].min())
@@ -481,4 +532,4 @@ class Mocalum:
         t = np.arange(0, u_4d.shape[0]*self.t_res, self.t_res)
         x_coord = np.arange(0, no_items*x_res, x_res) + x_start_pos
 
-        self.data._cr8_4d_tfield_ds(u_4d, v_4d, w_4d, x_coord, t)
+        self.data._cr8_4d_tfield_ds(id, u_4d, v_4d, w_4d, x_coord, t)
