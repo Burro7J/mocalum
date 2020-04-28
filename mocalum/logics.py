@@ -145,25 +145,25 @@ class Mocalum:
         self.x = x
         self.data._add_xyz(lidar_id,x,y,z)
 
-    def _cr8_ffield_bbox(self):
+    def _cr8_ffield_bbox(self, lidar_id):
         # TODO: Maybe add rot matrix which does not do anything to coordinates
         CRS = {'x':'Absolute coordinate, coresponds to Easting in m',
                'y':'Absolute coordinate, coresponds to Northing in m',
                'z':'Absolute coordinate, coresponds to height above sea level in m',
                'rot_matrix':_rot_matrix(90)}
 
-        x_coord= np.array([self.data.probing.x.min() - self.x_res,
-                           self.data.probing.x.max() + self.x_res])
-        y_coord= np.array([self.data.probing.y.min() - self.y_res,
-                           self.data.probing.y.max() + self.y_res])
-        z_coord= np.array([self.data.probing.z.min() - self.z_res,
-                           self.data.probing.z.max() + self.z_res])
-        t_coord = self.data.probing.time.values
+        x_coord= np.array([self.data.probing[lidar_id].x.min() - self.x_res,
+                           self.data.probing[lidar_id].x.max() + self.x_res])
+        y_coord= np.array([self.data.probing[lidar_id].y.min() - self.y_res,
+                           self.data.probing[lidar_id].y.max() + self.y_res])
+        z_coord= np.array([self.data.probing[lidar_id].z.min() - self.z_res,
+                           self.data.probing[lidar_id].z.max() + self.z_res])
+        t_coord = self.data.probing[lidar_id].time.values
         t_res = calc_mean_step(t_coord)
         self.t_res = t_res
 
         # create/updated flow field bounding box config dict
-        self.data._cr8_bbox_dict(CRS,
+        self.data._cr8_bbox_dict(lidar_id, CRS,
                                  x_coord, y_coord, z_coord, t_coord,
                                  0,0,0,0,
                                  self.x_res, self.y_res, self.z_res, t_res)
@@ -298,7 +298,7 @@ class Mocalum:
         self._calc_xyz(lidar_id)
 
         # # create flow field bounding box dict
-        # self._cr8_ffield_bbox()
+        self._cr8_ffield_bbox(lidar_id)
 
     def gen_unc_contributors(self, lidar_id, unc_cfg = None):
 

@@ -16,25 +16,16 @@ class Data:
         self.ffield = None # should be key-value pairs
         self._ffield = None # should be key-value pairs
         self.rc_wind = None # should be key-value pairs
-        self._lidar_dict = {}
         self.fmodel_cfg = {}
         self.meas_cfg = {}
-        self.ffield_bbox_cfg = {} # depending on
-        self.unc_cfg = {'azimuth':{'mu':0, 'std':0.1},
-                        'elevation':{'mu':0, 'std':0.1},
-                        'range':{'mu':0, 'std':10},
-                        'estimation':{'mu':0, 'std':0.1},
-                        'corr_coef':0}
+        self.ffield_bbox_cfg = {} # should be a dict with lidar_id as key!
 
-
-    def _cr8_lidar_cfg(self, cfg):
-        self.lidar_cfg = cfg
 
     def _cr8_fmodel_cfg(self, cfg):
         self.fmodel_cfg = cfg
 
 
-    def _cr8_bbox_dict(self, CRS,
+    def _cr8_bbox_dict(self,lidar_id, CRS,
                        x_coord, y_coord, z_coord,t_coord,
                        x_offset, y_offset, z_offset,t_offset,
                        x_res, y_res, z_res, t_res):
@@ -68,7 +59,7 @@ class Data:
                               'offset':t_offset,
                               'res':t_res}})
 
-        self.ffield_bbox_cfg = bbox_cfg
+        self.ffield_bbox_cfg.update({lidar_id:bbox_cfg})
 
 
 
