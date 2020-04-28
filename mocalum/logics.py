@@ -77,16 +77,16 @@ class Mocalum:
 
         Other Parameters
         -----------------
-        u_estimation : float, optional
+        unc_est : float, optional
             Uncertainty in estimating radial velocity from Doppler spectra.
             Unless provided, (default) value is set to 0.1 m/s.
-        u_range : float, optional
+        unc_rng : float, optional
             Uncertainty in detecting range at which atmosphere is probed.
             Unless provided, (default) value is set to 1 m.
-        u_azimuth : float, optional
+        unc_az : float, optional
             Uncertainty in the beam steering for the azimuth angle.
             Unless provided, (default) value is set to 0.1 deg.
-        u_elevation : float, optional
+        unc_el : float, optional
             Uncertainty in the beam steering for the elevation angle.
             Unless provided, (default) value is set to 0.1 deg.
         corr_coef : float, optional
@@ -105,15 +105,15 @@ class Mocalum:
             raise ValueError("Lidar position is not properly provided")
 
 
-        unc_elements = ['u_estimation', 'u_azimuth','u_elevation',
-                        'u_range', 'corr_coef']
+        unc_elements = ['unc_est', 'unc_az','unc_el',
+                        'unc_rng', 'corr_coef']
 
         lidar_dict = {id:{'position': lidar_pos,
                           'uncertainty':{
-                              'u_azimuth':{'mu':0,'std':0.1,'units':'deg'},
-                              'u_elevation':{'mu':0, 'std':0.1, 'units':'deg'},
-                              'u_range':{'mu':0, 'std':0.1, 'units':'m'},
-                              'u_estimation':{'mu':0, 'std':0.1, 'units':'m.s^-1'},
+                              'unc_az':{'mu':0,'std':0.1,'units':'deg'},
+                              'unc_el':{'mu':0, 'std':0.1, 'units':'deg'},
+                              'unc_rng':{'mu':0, 'std':0.1, 'units':'m'},
+                              'unc_est':{'mu':0, 'std':0.1, 'units':'m.s^-1'},
                               'corr_coef':0},
                           'config': {},
                                         }
@@ -134,7 +134,7 @@ class Mocalum:
         #         ' instrument(s).')
 
     def _calc_xyz(self, lidar_id):
-        probing_ds = self.data.probing.sel(lidar_id = lidar_id)
+        probing_ds = self.data.probing[lidar_id]
         x,y,z = spher2cart(probing_ds.az  + probing_ds.unc_az,
                            probing_ds.el  + probing_ds.unc_el,
                            probing_ds.rng  + probing_ds.unc_rng)
@@ -300,23 +300,35 @@ class Mocalum:
         # # create flow field bounding box dict
         # self._cr8_ffield_bbox()
 
-    def _gen_unc_contributors(self, lidar_id):
+    def gen_unc_contributors(self, lidar_id, unc_cfg = None):
+
+        no_los = self.data.meas_cfg[lidar_id]['config']['no_los']
+        no_scans = self.data.meas_cfg[lidar_id]['config']['no_scans']
+        if unc_cfg == None:
+            corr_coef = self.data.meas_cfg[lidar_id]['uncertainty']['corr_coef']
+            unc_cfg = self.data.meas_cfg[lidar_id]['uncertainty'].copy()
+            del unc_cfg['corr_coef']
+        else:
+            corr_coef = unc_cfg['corr_coef']
+            unc_cfg = unc_cfg.copy()
+            del unc_cfg['corr_coef']
+
 
 
 
         # sample uncertainty contribution considering normal distribution
         # and add them to probing xr.DataSet
         for unc_term, cfg in unc_cfg.items():
-            samples = gen_unc(np.full(self.data.meas_cfg['no_los'], cfg['mu']),
-                              np.full(self.data.meas_cfg['no_los'], cfg['std']),
-                              corr_coef, self.data.meas_cfg['no_scans'])
-            self.data._add_unc(unc_term, samples.flatten())
+            samples = gen_unc(np.full(no_los, cfg['mu']),
+                              np.full(no_los, cfg['std']),
+                              corr_coef, no_scans)
+            self.data._add_unc(lidar_id, unc_term, samples.flatten())
 
         # update x,y,z coordinates of measurement points
-        self._calc_xyz()
+        self._calc_xyz(lidar_id)
 
-        # update flow field bounding box dict
-        self._cr8_ffield_bbox()
+        # # update flow field bounding box dict
+        # self._cr8_ffield_bbox()
 
 
     def gen_unc_contributors_old(self, corr_coef=0,
