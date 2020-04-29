@@ -436,13 +436,9 @@ class Mocalum:
         u, v, w = get_plaw_uvw(z_coord, href, ws, w, wdir, alpha)
 
         self.data._cr8_plfield_ds(lidar_id, u, v, w)
-
-    def calc_los_speed(self, lidar_id):
+    def calc_los_speed(self, lidar_id, bbox_id):
         """Calcutes projection of wind speed on beam line-of-sight
         """
-
-        # needs if lidars exist before proceeding forward
-
 
         if self.data.fmodel_cfg['flow_model'] == 'power_law':
             hmeas = self.data.probing.z.values
@@ -451,39 +447,45 @@ class Mocalum:
             w = self.data.ffield.w.isel(x=0,y=0).interp(z=hmeas)
 
         elif self.data.fmodel_cfg['flow_model'] == 'PyConTurb':
-            # slowest possible way of pulling u,v,w
-            # since it currently steps through each time stamp
-            # and interpolates data
-            time_prob = self.data.probing.time.values
-            time_tbox = self.data.ffield.time.values
-            R_tb = self.data.ffield_bbox_cfg['lidar']['CRS']['rot_matrix']
 
             # Normalize time to re-feed the turbulence
+            time_prob = self.data.probing[lidar_id].time.values
+            time_tbox = self.data.ffield.time.values
             time_norm = np.mod(time_prob, time_tbox.max())
-            u = np.empty(len(time_norm))
-            v = np.empty(len(time_norm))
-            w = np.empty(len(time_norm))
 
-            for i,t in enumerate(tqdm(time_norm, desc='Projecting LOS')):
-                x = self.data.probing.x.isel(time = i).values
-                y = self.data.probing.y.isel(time = i).values
-                z = self.data.probing.z.isel(time = i).values
+            # Rotate relative coordinates to absolute coordinates
+            R_tb = self.data.ffield_bbox_cfg[bbox_id]['CRS']['rot_matrix']
+            x_r = self.data.probing[lidar_id].x.values
+            y_r = self.data.probing[lidar_id].y.values
+            z_coords = self.data.probing[lidar_id].z.values
+            xy = np.array([x_r,y_r]).T.dot(R_tb)
+            x_coords = xy[:,0]
+            y_coords = xy[:,1]
 
-                xy = np.array([x,y]).dot(R_tb)
+            t = xr.DataArray(time_norm, dims='pt')
+            x = xr.DataArray(x_coords, dims='pt')
+            y = xr.DataArray(y_coords, dims='pt')
+            z = xr.DataArray(z_coords, dims='pt')
 
-                u[i] = self.data.ffield.u.interp(time=t, x=xy[0], y=xy[1], z=z).values
-                v[i] = self.data.ffield.v.interp(time=t, x=xy[0], y=xy[1], z=z).values
-                w[i] = self.data.ffield.w.interp(time=t, x=xy[0], y=xy[1], z=z).values
+            ffield_pts = self.data.ffield.interp(time=t,
+                                                 x=x,
+                                                 y=y,
+                                                 z=z, method='linear')
+
+            u = ffield_pts.u
+            v = ffield_pts.v
+            w = ffield_pts.w
+
 
         los = project2los(u,v,w,
-                        self.data.probing.az.values +
-                        self.data.probing.unc_az.values,
-                        self.data.probing.el.values +
-                        self.data.probing.unc_el.values)
-        los += self.data.probing.unc_est.values
-        self.data._cr8_los_ds(los)
+                        self.data.probing[lidar_id].az.values +
+                        self.data.probing[lidar_id].unc_az.values,
+                        self.data.probing[lidar_id].el.values +
+                        self.data.probing[lidar_id].unc_el.values)
+        los += self.data.probing[lidar_id].unc_est.values
+        self.data._cr8_los_ds(lidar_id, los)
 
-    def reconstruct_wind(self, rc_method = 'IVAP'):
+    def reconstruct_wind(self, lidar_id, rc_method = 'IVAP'):
         """Reconstructs wind speed according to the selected retrieval method
 
         Parameters
@@ -493,13 +495,13 @@ class Mocalum:
         """
 
         if rc_method == 'IVAP':
-            vrad = np.asarray(np.split(self.data.los.vrad.values,
-                                    self.data.los.no_scans.values))
-            azm = np.asarray(np.split(self.data.los.az.values,
-                                    self.data.los.no_scans.values))
+            vrad = np.asarray(np.split(self.data.los[lidar_id].vrad.values,
+                                       self.data.los[lidar_id].no_scans.values))
+            azm = np.asarray(np.split(self.data.los[lidar_id].az.values,
+                                      self.data.los[lidar_id].no_scans.values))
             u, v, ws = ivap_rc(vrad, azm, 1)
 
-            self.data._cr8_rc_wind_ds(u,v,ws)
+            self.data._cr8_rc_wind_ds(lidar_id, u,v,ws)
         else:
             print('Unsupported wind reconstruction method')
 

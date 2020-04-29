@@ -12,7 +12,7 @@ from tqdm import tqdm
 class Data:
     def __init__(self):
         self.probing = {}
-        self.los = None # should be key-value pairs
+        self.los = {} # should be key-value pairs
         self.ffield = None # should be key-value pairs
         self._ffield = None # should be key-value pairs
         self.rc_wind = None # should be key-value pairs
@@ -360,23 +360,24 @@ class Data:
         self.probing[lidar_id].y.values = y.values
         self.probing[lidar_id].z.values = z.values
 
-    def _cr8_los_ds(self, los):
+    def _cr8_los_ds(self, lidar_id, los):
         # TODO: detect what type of measurements it is (PPI, RHI, etc.)
         # TODO: we need somehow to
-        self.los = xr.Dataset({'vrad': (['time'], los),
-                              'az': (['time'], self.probing.az.values),
-                              'el': (['time'], self.probing.el.values),
-                              'rng': (['time'], self.probing.rng.values),
-                              'no_scans':(self.probing.no_scans.values),
-                              'no_los':  (self.probing.no_los.values)
-                              },coords={'time': self.probing.time.values})
+        los = xr.Dataset({'vrad': (['time'], los),
+                              'az': (['time'],  self.probing[lidar_id].az.values),
+                              'el': (['time'],  self.probing[lidar_id].el.values),
+                              'rng': (['time'], self.probing[lidar_id].rng.values),
+                              'no_scans':(self.probing[lidar_id].no_scans.values),
+                              'no_los':  (self.probing[lidar_id].no_los.values)
+                              },coords={'time': self.probing[lidar_id].time.values})
 
 
         # adding/updating metadata
-        self.los = self._add_metadata(self.los, metadata,
-                                      'Radial wind speed dataset')
+        los = self._add_metadata(los, metadata,'Radial wind speed dataset')
 
-    def _cr8_rc_wind_ds(self, u, v, ws):
+        self.los.update({lidar_id:los})
+
+    def _cr8_rc_wind_ds(self, lidar_id, u, v, ws):
         self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
                                    'u': (['scan'], u),
                                    'v': (['scan'], v)
@@ -386,7 +387,7 @@ class Data:
         # adding/updating metadata
         self.rc_wind = self._add_metadata(self.rc_wind, metadata,
                                       'Reconstructed wind')
-        self.rc_wind.attrs['scan_type'] = self.meas_cfg['scan_type']
+        self.rc_wind.attrs['scan_type'] = self.meas_cfg[lidar_id]['config']['scan_type']
 
     def _get_ffield_coords(self, id):
         bbox_cfg=self.ffield_bbox_cfg[id]
