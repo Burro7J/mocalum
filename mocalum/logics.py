@@ -124,14 +124,8 @@ class Mocalum:
                 if element in kwargs:
                     lidar_dict['uncertainty']['element'] = kwargs['element']
 
-
         self.data.meas_cfg.update(lidar_dict)
 
-        # if self.verbos:
-        #     print('Instrument \'' + instrument_id + '\' of category \'' +
-        #         category +'\' added to the instrument dictionary, ' +
-        #         'which now contains ' + str(len(self.instruments)) +
-        #         ' instrument(s).')
 
     def _calc_xyz(self, lidar_id):
         probing_ds = self.data.probing[lidar_id]
@@ -144,6 +138,33 @@ class Mocalum:
         z.values+=self.data.meas_cfg[lidar_id]['position'][2]
         self.x = x
         self.data._add_xyz(lidar_id,x,y,z)
+
+
+
+    def _cr8_bbox_meas_pts(self, lidar_id):
+        CRS = {'x':'Absolute coordinate, coresponds to Easting in m',
+               'y':'Absolute coordinate, coresponds to Northing in m',
+               'z':'Absolute coordinate, coresponds to height above sea level in m',
+               'rot_matrix':_rot_matrix(90)}
+
+        x_coord= np.array([self.data.probing[lidar_id].x.min() - self.x_res,
+                           self.data.probing[lidar_id].x.max() + self.x_res])
+        y_coord= np.array([self.data.probing[lidar_id].y.min() - self.y_res,
+                           self.data.probing[lidar_id].y.max() + self.y_res])
+        z_coord= np.array([self.data.probing[lidar_id].z.min() - self.z_res,
+                           self.data.probing[lidar_id].z.max() + self.z_res])
+        t_coord = self.data.probing[lidar_id].time.values
+        t_res = calc_mean_step(t_coord)
+        self.t_res = t_res
+
+        # create/updated flow field bounding box config dict
+        self.data._cr8_bbox_dict('lidar', lidar_id, CRS,
+                                 x_coord, y_coord, z_coord, t_coord,
+                                 0,0,0,0,
+                                 self.x_res, self.y_res, self.z_res, t_res)
+
+
+
 
     def _cr8_ffield_bbox(self, lidar_id):
         # TODO: Maybe add rot matrix which does not do anything to coordinates
@@ -172,22 +193,20 @@ class Mocalum:
 
     def _cr8_turbbbox(self, lidar_id):
         # needs to find an average azimuth between n lidar
+        linked_lidars = []
         try:
             if type(lidar_id) == str:
                 avg_azimuth = self.data.meas_cfg[lidar_id]['config']['az'].mean()
                 beam_xyz = self._get_prob_cords(lidar_id)
-                name_bbox = 'turb_for_' + lidar_id
+                linked_lidars += [lidar_id]
 
             elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
-                name_bbox = 'turb_for_'
                 for i, id in enumerate(lidar_id):
+                    linked_lidars += [id]
                     if i == 0:
                         beam_xyz =self._get_prob_cords(id)
                         aa = self.data.meas_cfg[id]['config']['az'].mean()
-                        name_bbox += id
                     else:
-                        name_bbox += '_and_'
-                        name_bbox += id
                         beam_xyz = np.append(beam_xyz,
                                              self._get_prob_cords(id),
                                              axis = 0)
@@ -204,8 +223,7 @@ class Mocalum:
                'y':'Relative coordinate, use inv(rot_matrix) to convert to abs',
                'z':'Absolute coordinate, coresponds to height above sea level',
                'rot_matrix':R_tb}
-        # get probing coordinates
-        # beam_xyz = self._get_prob_cords()
+
 
         # reproject probing coordinates to coordinate system where
         # y axis is aligned with the mean azimuth direction
@@ -224,12 +242,12 @@ class Mocalum:
         self.t_res = t_res
         t_coord = np.arange(0, self.turbbox_time + t_res, t_res)
 
-        self.data._cr8_bbox_dict(name_bbox, CRS,
+        self.data._cr8_bbox_dict('ffield', 'turbulence_box', CRS,
                                  bbox_pts[:,0], bbox_pts[:,1], beam_xyz[:,2],
                                  t_coord,
                                  0, 0, 0, 0,
-                                 self.x_res, self.y_res, self.z_res, t_res)
-        return name_bbox
+                                 self.x_res, self.y_res, self.z_res, t_res,
+                                 linked_lidars = linked_lidars)
 
     def gen_turb_ffield(self,lidar_id,
                         ws=10, wdir=180, w=0, href=100, alpha=0.2):
@@ -256,13 +274,13 @@ class Mocalum:
                      'shear_expornent':alpha,
                      }
         self.data._cr8_fmodel_cfg(fmodel_cfg)
-        name_bbox = self._cr8_turbbbox(lidar_id)
+        self._cr8_turbbbox(lidar_id)
         # self.data._cr8_empty_tfield_ds()
 
-        _, y, z, _ = self.data._get_ffield_coords(name_bbox)
+        _, y, z, _ = self.data._get_ffield_coords('turbulence_box')
         spat_df = gen_spat_grid(y, z)
         T_tot = self.turbbox_time
-        T_res = self.data.ffield_bbox_cfg[name_bbox]['t']['res']
+        T_res = self.data.bbox_ffield['turbulence_box']['t']['res']
 
 
         turb_df = gen_turb(spat_df, T=T_tot + T_res,
@@ -270,10 +288,10 @@ class Mocalum:
                            wsp_func = power_profile,
                            u_ref=ws, z_ref=href, alpha=alpha)
 
-        self.data._cr8_3d_tfield_ds(name_bbox, turb_df)
+        self.data._cr8_3d_tfield_ds('turbulence_box', turb_df)
 
         # self.data._upd8_tfield_ds(turb_df)
-        self._to_4D_ds(name_bbox)
+        self._to_4D_ds('turbulence_box')
 
 
     def set_ivap_probing(self, lidar_id, sector_size, azimuth_mid, angular_res,
@@ -326,7 +344,7 @@ class Mocalum:
         self._calc_xyz(lidar_id)
 
         # # create flow field bounding box dict
-        self._cr8_ffield_bbox(lidar_id)
+        self._cr8_bbox_meas_pts(lidar_id)
 
     def gen_unc_contributors(self, lidar_id, unc_cfg = None):
 
@@ -341,9 +359,6 @@ class Mocalum:
             unc_cfg = unc_cfg.copy()
             del unc_cfg['corr_coef']
 
-
-
-
         # sample uncertainty contribution considering normal distribution
         # and add them to probing xr.DataSet
         for unc_term, cfg in unc_cfg.items():
@@ -355,33 +370,9 @@ class Mocalum:
         # update x,y,z coordinates of measurement points
         self._calc_xyz(lidar_id)
 
-        # # update flow field bounding box dict
-        self._cr8_ffield_bbox(lidar_id)
+        # update flow field bounding box dict
+        self._cr8_bbox_meas_pts(lidar_id)
 
-
-    # def gen_unc_contributors_old(self, corr_coef=0,
-    #                          unc_cfg={'unc_az':{'mu':0, 'std':0.1},
-    #                                   'unc_el':{'mu':0, 'std':0.1},
-    #                                   'unc_rng':{'mu':0, 'std':10},
-    #                                   'unc_est':{'mu':0, 'std':0.1}}):
-
-    #     # store information in unc_cfg
-    #     self.data.unc_cfg.update(unc_cfg)
-    #     self.data.unc_cfg.update({'corr_coef':corr_coef})
-
-    #     # sample uncertainty contribution considering normal distribution
-    #     # and add them to probing xr.DataSet
-    #     for unc_term, cfg in unc_cfg.items():
-    #         samples = gen_unc(np.full(self.data.meas_cfg['no_los'], cfg['mu']),
-    #                           np.full(self.data.meas_cfg['no_los'], cfg['std']),
-    #                           corr_coef, self.data.meas_cfg['no_scans'])
-    #         self.data._add_unc(unc_term, samples.flatten())
-
-    #     # update x,y,z coordinates of measurement points
-    #     self._calc_xyz()
-
-    #     # update flow field bounding box dict
-    #     self._cr8_ffield_bbox()
 
     def gen_plaw_ffield(self,lidar_id,
                         ws=10, wdir=180, w=0, href=100, alpha=0.2):
@@ -400,7 +391,7 @@ class Mocalum:
         alpha : float, optional
             shear expoenent, by default 0.2
         """
-
+        linked_lidars = []
         fmodel_cfg= {'flow_model':'power_law',
                      'wind_speed':ws,
                      'upward_velocity':w,
@@ -410,35 +401,113 @@ class Mocalum:
                      }
         self.data._cr8_fmodel_cfg(fmodel_cfg)
 
-
         try:
             if type(lidar_id) == str:
-                z_coord= np.arange(self.data.ffield_bbox_cfg[lidar_id]['z']['min'],
-                                   self.data.ffield_bbox_cfg[lidar_id]['z']['max'],
-                                   self.data.ffield_bbox_cfg[lidar_id]['z']['res'])
+
+                linked_lidars += [lidar_id]
+                z_min = self.data.bbox_meas_pts[lidar_id]['z']['min']
+                z_max = self.data.bbox_meas_pts[lidar_id]['z']['max']
+                z_res = self.data.bbox_meas_pts[lidar_id]['z']['res']
+                y_min = self.data.bbox_meas_pts[lidar_id]['y']['min']
+                y_max = self.data.bbox_meas_pts[lidar_id]['y']['max']
+                y_res = self.data.bbox_meas_pts[lidar_id]['y']['res']
+                x_min = self.data.bbox_meas_pts[lidar_id]['x']['min']
+                x_max = self.data.bbox_meas_pts[lidar_id]['x']['max']
+                x_res = self.data.bbox_meas_pts[lidar_id]['x']['res']
+                t_min = self.data.bbox_meas_pts[lidar_id]['t']['min']
+                t_max = self.data.bbox_meas_pts[lidar_id]['t']['max']
+                t_res = self.data.bbox_meas_pts[lidar_id]['t']['res']
+
             elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
                 z_min = np.empty(len(lidar_id))
                 z_max = np.empty(len(lidar_id))
                 z_res = np.empty(len(lidar_id))
-                for i,id in enumerate(lidar_id):
-                    z_min[i]= self.data.ffield_bbox_cfg[id]['z']['min']
-                    z_max[i]= self.data.ffield_bbox_cfg[id]['z']['max']
-                    z_res[i]= self.data.ffield_bbox_cfg[id]['z']['res']
+                y_min = np.empty(len(lidar_id))
+                y_max = np.empty(len(lidar_id))
+                y_res = np.empty(len(lidar_id))
+                x_min = np.empty(len(lidar_id))
+                x_max = np.empty(len(lidar_id))
+                x_res = np.empty(len(lidar_id))
+                t_min = np.empty(len(lidar_id))
+                t_max = np.empty(len(lidar_id))
+                t_res = np.empty(len(lidar_id))
 
-                z_coord = np.arange(z_min.min() - z_res.min(),
-                                    z_max.max() + z_res.min(), z_res.min())
+                for i,id in enumerate(lidar_id):
+
+                    linked_lidars += [id]
+
+                    z_min[i]= self.data.bbox_meas_pts[id]['z']['min']
+                    z_max[i]= self.data.bbox_meas_pts[id]['z']['max']
+                    z_res[i]= self.data.bbox_meas_pts[id]['z']['res']
+                    y_min[i]= self.data.bbox_meas_pts[id]['y']['min']
+                    y_max[i]= self.data.bbox_meas_pts[id]['y']['max']
+                    y_res[i]= self.data.bbox_meas_pts[id]['y']['res']
+                    x_min[i]= self.data.bbox_meas_pts[id]['x']['min']
+                    x_max[i]= self.data.bbox_meas_pts[id]['x']['max']
+                    x_res[i]= self.data.bbox_meas_pts[id]['x']['res']
+                    t_min[i]= self.data.bbox_meas_pts[id]['t']['min']
+                    t_max[i]= self.data.bbox_meas_pts[id]['t']['max']
+                    t_res[i]= self.data.bbox_meas_pts[id]['t']['res']
+
+                z_min = z_min.min()
+                z_max = z_max.max()
+                z_res = z_res.min()
+                y_min = y_min.min()
+                y_max = y_max.max()
+                y_res = y_res.min()
+                x_min = x_min.min()
+                x_max = x_max.max()
+                x_res = x_res.min()
+                t_min = t_min.min()
+                t_max = t_max.max()
+                t_res = t_res.min()
+
+            CRS = {'x':'Absolute coordinate, coresponds to Easting in m',
+                   'y':'Absolute coordinate, coresponds to Northing in m',
+                   'z':'Absolute coordinate, coresponds to height above sea level in m',
+                   'rot_matrix':_rot_matrix(90)}
+
+
+        # create/updated flow field bounding box config dict
+            self.data._cr8_bbox_dict('ffield', 'power_law', CRS,
+                                    np.array([x_min, x_max]),
+                                    np.array([y_min, y_max]),
+                                    np.array([z_min, z_max]),
+                                    np.array([t_min, t_max]),
+                                    0,0,0,0,
+                                    x_res, y_res, z_res, t_res,
+                                    linked_lidars=linked_lidars)
+
+
+
         except:
             raise ValueError('lidar id(s) does not exist !')
 
 
 
 
-        u, v, w = get_plaw_uvw(z_coord, href, ws, w, wdir, alpha)
+        u, v, w = get_plaw_uvw(np.arange(z_min, z_max + z_res, z_res),
+                               href, ws, w, wdir, alpha)
+        self.data._cr8_plfield_ds('power_law', u, v, w)
 
-        self.data._cr8_plfield_ds(lidar_id, u, v, w)
-    def calc_los_speed(self, lidar_id, bbox_id):
+    def calc_los_speed(self, lidar_id, ffield_id):
         """Calcutes projection of wind speed on beam line-of-sight
         """
+
+        if not(ffield_id in self.data.bbox_ffield):
+            raise ValueError('Flow field does not exist')
+
+        if type(lidar_id) == str:
+            if not(lidar_id in self.data.bbox_ffield[ffield_id]['linked_lidars']):
+                raise ValueError('lidar id not linked to flow field!')
+
+        elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
+            for i,id in enumerate(lidar_id):
+                if not(id in self.data.bbox_ffield[ffield_id]['linked_lidars']):
+                    raise ValueError('lidar id not linked to flow field!')
+        else:
+            raise TypeError('Input type for lidar_id is not valid')
+
 
         if self.data.fmodel_cfg['flow_model'] == 'power_law':
             hmeas = self.data.probing.z.values
@@ -454,7 +523,7 @@ class Mocalum:
             time_norm = np.mod(time_prob, time_tbox.max())
 
             # Rotate relative coordinates to absolute coordinates
-            R_tb = self.data.ffield_bbox_cfg[bbox_id]['CRS']['rot_matrix']
+            R_tb = self.data.bbox_ffield[ffield_id]['CRS']['rot_matrix']
             x_r = self.data.probing[lidar_id].x.values
             y_r = self.data.probing[lidar_id].y.values
             z_coords = self.data.probing[lidar_id].z.values
@@ -513,10 +582,10 @@ class Mocalum:
 
         return np.array([x,y,z]).transpose()
 
-
     def _to_4D_ds(self, id):
+        # Should go to persistance
         ws = self.data.fmodel_cfg['wind_speed']
-        bbox_pts = bbox_pts_from_cfg(self.data.ffield_bbox_cfg[id])
+        bbox_pts = bbox_pts_from_cfg(self.data.bbox_ffield[id])
 
         x_start_pos = bbox_pts[:,0].min()
         x_len = abs(bbox_pts[:,0].max() - bbox_pts[:,0].min())
