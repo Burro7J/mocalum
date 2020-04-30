@@ -750,7 +750,7 @@ class Mocalum:
 
     # Methods related to reconstruction of wind vector from los measurements
     #
-    def _IVAP_reconstruction(self, lidar_id):
+    def _IVAP_reconstruction(self, lidar_id, no_scans_avg=None):
         """
         IVAP wind reconstruction method
 
@@ -758,7 +758,12 @@ class Mocalum:
         ----------
         lidar_id : str
             Id of lidar for which LOS speed should be converted to wind vector
+
+        no_scans_avg : int
+            Number of scans to average prior reconstruction
         """
+
+        # need first to average scans prior splitting for reconstruciton
 
         vrad = np.asarray(np.split(self.data.los[lidar_id].vrad.values,
                                     self.data.los[lidar_id].no_scans.values))
@@ -767,6 +772,12 @@ class Mocalum:
         u, v, ws = ivap_rc(vrad, azm, 1)
 
         self.data._cr8_rc_wind_ds(lidar_id, u,v,ws)
+
+    def _dual_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
+        print('Not yet implemented')
+
+    def _triple_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
+        print('Not yet implemented')
 
     def reconstruct_wind(self, lidar_id, rc_method = 'IVAP'):
         """Reconstructs wind speed according to the selected retrieval method
@@ -781,5 +792,9 @@ class Mocalum:
 
         if rc_method == 'IVAP':
             self._IVAP_reconstruction(lidar_id)
+        elif rc_method == 'dual-Doppler':
+            self._dual_Doppler_reconstruction(lidar_id)
+        elif rc_method == 'triple-Doppler':
+            self._triple_Doppler_reconstruction(lidar_id)
         else:
             print('Unsupported wind reconstruction method')
