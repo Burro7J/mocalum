@@ -7,7 +7,7 @@ import numpy as np
 from numpy.linalg import inv as inv
 import xarray as xr
 from tqdm import tqdm
-
+from .utils import sliding_window_slicing, bbox_pts_from_array, bbox_pts_from_cfg
 
 class Data:
     def __init__(self):
@@ -103,14 +103,37 @@ class Data:
                                          'Turbulent flow field dataset')
         self.ffield.attrs['generator'] = 'PyConTurb'
 
-    def _cr8_4d_tfield_ds(self, id, u, v, w, x, t):
+    def _cr8_4d_tfield_ds(self, id):
 
         self._ffield = self.ffield
         R_tb = self.bbox_ffield[id]['CRS']['rot_matrix']
         y = self.ffield.y.values
         z = self.ffield.z.values
 
+
+        ws = self.fmodel_cfg['wind_speed']
+        bbox_pts = bbox_pts_from_cfg(self.bbox_ffield[id])
+        t_res = self.bbox_ffield[id]['t']['res']
+
+        x_start_pos = bbox_pts[:,0].min()
+        x_len = abs(bbox_pts[:,0].max() - bbox_pts[:,0].min())
+        x_res = ws * t_res
+        no_items = int(np.ceil(x_len / x_res)) + 1
+
+        u_3d = self.ffield.u.values.transpose()
+        v_3d = self.ffield.v.values.transpose()
+        w_3d = self.ffield.w.values.transpose()
+
+        u_4d = sliding_window_slicing(u_3d, no_items, item_type=1).transpose(0,3,2,1)
+        v_4d = sliding_window_slicing(v_3d, no_items, item_type=1).transpose(0,3,2,1)
+        w_4d = sliding_window_slicing(w_3d, no_items, item_type=1).transpose(0,3,2,1)
+
+        t = np.arange(0, u_4d.shape[0]*t_res, t_res)
+        x = np.arange(0, no_items*x_res, x_res) + x_start_pos
+
+
         ew = np.empty((len(x),len(y),2))
+
 
 
         for i in range(0,len(x)):
@@ -118,9 +141,9 @@ class Data:
                 ew[i,j] = np.array([x[i],y[j]]).dot(inv(R_tb))
 
 
-        self.ffield = xr.Dataset({'u': (['time', 'z', 'y', 'x'], u),
-                                     'v': (['time', 'z', 'y', 'x'], v),
-                                     'w': (['time', 'z', 'y', 'x'], w)},
+        self.ffield = xr.Dataset({'u': (['time', 'z', 'y', 'x'], u_4d),
+                                  'v': (['time', 'z', 'y', 'x'], v_4d),
+                                  'w': (['time', 'z', 'y', 'x'], w_4d)},
                                 coords={'time': t,
                                         'y': y,
                                         'z': z,
