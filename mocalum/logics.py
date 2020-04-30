@@ -60,7 +60,7 @@ class Mocalum:
                     print(messages[i])
             return False
 
-    def add_lidar(self, id, lidar_pos, **kwargs):
+    def add_lidar(self, id, lidar_pos, unc_dict = None):
         """Adds a lidar instance to the measurement config
 
         Lidars can be add one at time. Currently only the instrument position
@@ -74,26 +74,30 @@ class Mocalum:
             1D array containing data with `float` or `int` type corresponding
             to Northing, Easting and Height coordinates of the instrument.
             1D array data are expressed in meters.
+        unc_dict : dict
+            Dictionary containing values of uncertainty contributors,
+            by default it is set to None,
 
-        Other Parameters
-        -----------------
-        unc_est : float, optional
-            Uncertainty in estimating radial velocity from Doppler spectra.
-            Unless provided, (default) value is set to 0.1 m/s.
-        unc_rng : float, optional
-            Uncertainty in detecting range at which atmosphere is probed.
-            Unless provided, (default) value is set to 1 m.
-        unc_az : float, optional
-            Uncertainty in the beam steering for the azimuth angle.
-            Unless provided, (default) value is set to 0.1 deg.
-        unc_el : float, optional
-            Uncertainty in the beam steering for the elevation angle.
-            Unless provided, (default) value is set to 0.1 deg.
-        corr_coef : float, optional
-            Correlation coffecient of inputs
-            Default 0, uncorrelated inputs
-            Max 1, 100% correlated inputs
+        Note
+        ----
+        unc_dict can have following keys:
+            - unc_est : float
+                Uncertainty in estimating radial velocity from Doppler spectra.
+            - unc_rng : float
+                Uncertainty in detecting range at which atmosphere is probed.
+            - unc_az : float
+                Uncertainty in the beam steering for the azimuth angle.
+            - unc_el : float
+                Uncertainty in the beam steering for the elevation angle.
+            - corr_coef : float
+                Correlation coffecient of inputs
 
+        In case when unc_dict is None default values will be set:
+            unc_est =  0.1  (in m/s)
+            unc_rng = 1 (in m)
+            unc_az = 0.1 (deg)
+            unc_el = 0.1 (deg)
+            corr_coef = 0 (uncorrelated inputs)
         """
         if not(self._is_lidar_pos(lidar_pos)):
             raise ValueError("Lidar position is not properly provided")
@@ -113,10 +117,13 @@ class Mocalum:
                                         }
                         }
 
-        if kwargs != None:
+        if unc_dict != None:
             for element in unc_elements:
-                if element in kwargs:
-                    lidar_dict['uncertainty']['element'] = kwargs['element']
+                if element in unc_dict:
+                    if element != 'corr_coef':
+                        lidar_dict[id]['uncertainty'][element]['std'] = unc_dict[element]
+                    else:
+                        lidar_dict[id]['uncertainty'][element] = unc_dict[element]
 
         self.data.meas_cfg.update(lidar_dict)
 
@@ -176,9 +183,7 @@ class Mocalum:
                                  self.x_res, self.y_res, self.z_res, t_res)
 
 
-    def generate_PPI_scan(self, lidar_id, sector_size, azimuth_mid, angular_res,
-                     elevation, rng, no_scans = 1,
-                     scan_speed=1, max_speed=50, max_acc=100):
+    def generate_PPI_scan(self, lidar_id, PPI_cfg):
         """
         Generate measurement points for PPI scan and create probing DataSet
 
@@ -206,6 +211,17 @@ class Mocalum:
             Max permitted angular acceleration, by default 100 deg/s^2
 
         """
+
+
+        sector_size = PPI_cfg['sector_size']
+        azimuth_mid = PPI_cfg['azimuth_mid']
+        angular_res = PPI_cfg['angular_res']
+        elevation = PPI_cfg['elevation']
+        rng = PPI_cfg['range']
+        no_scans  = PPI_cfg['no_scans']
+        scan_speed = PPI_cfg['scan_speed']
+        max_speed = PPI_cfg['max_speed']
+        max_acc = PPI_cfg['max_acc']
 
 
         # prevent users stupidity raise errors!
