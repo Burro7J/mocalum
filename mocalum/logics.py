@@ -337,7 +337,7 @@ class Mocalum:
     #
     def _create_absolute_bbox(self, lidar_id, bbox_id):
         """
-        Creates wind field bounding box considering measurement pts
+        Creates wind field bounding box round measurement pts
         in absolute coordinate system
 
         Parameters
@@ -430,7 +430,7 @@ class Mocalum:
 
     def _get_prob_cords(self, lidar_id):
         """
-        Exports probing coordinates from probing ds
+        Gets probing coordinates from probing ds
 
         Parameters
         ----------
@@ -452,8 +452,8 @@ class Mocalum:
     def _create_relative_bbox(self, lidar_id, bbox_id,
                               wind_speed, wind_from_direction):
         """
-        Creates wind field bounding box around measurement pts aligned
-        with wind direction
+        Creates wind field bounding box around measurement pts in a coordinate
+        system aligned with wind direction
 
         Parameters
         ----------
@@ -779,7 +779,7 @@ class Mocalum:
             Number of scans to average prior reconstruction
         """
 
-        # need first to average scans prior splitting for reconstruciton
+        # need first to average scans prior splitting for reconstruction
 
         vrad = np.asarray(np.split(self.data.los[lidar_id].vrad.values,
                                     self.data.los[lidar_id].no_scans.values))
