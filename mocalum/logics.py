@@ -8,7 +8,6 @@ from .utils import calc_mean_step, safe_execute, generate_beam_coords, trajector
 from .samples import gen_unc
 from tqdm import tqdm
 
-
 # turbulence box generation tools
 from pyconturb.wind_profiles import power_profile
 from pyconturb import gen_turb, gen_spat_grid
@@ -276,6 +275,31 @@ class Mocalum:
         # # create flow field bounding box dict
         self._cr8_bbox_meas_pts(lidar_id)
 
+    def _single_lidar_ct_traj(self, lidar_id, CT_cfg):
+        meas_pts = CT_cfg['points']
+        no_scans = CT_cfg['no_scans']
+        max_speed = CT_cfg['max_speed']
+        max_acc = CT_cfg['max_acc']
+        acq_time = CT_cfg['acq_time']
+
+        lidar_pos = self.data.meas_cfg[lidar_id]['position']
+        beam_coord = generate_beam_coords(lidar_pos, meas_pts)
+
+        az = beam_coord[:,0]
+        el = beam_coord[:,1]
+        rng = beam_coord[:,2]
+
+        _ , _, displacement = trajectory2displacement(lidar_pos, meas_pts)
+        max_displacement = np.max(displacement, axis = 1)
+
+        traj_timing = displacement2time(max_displacement, max_speed, max_acc)
+
+        return {'az':az,
+                'el':el,
+                'rng':rng,
+                'max_displacement':max_displacement,
+                'traj_timing':traj_timing}
+
     def generate_complex_trajectory(self, lidar_id, CT_cfg):
         """
         Generate probing DataSet(s) for selected lidars and given measurement
@@ -293,78 +317,96 @@ class Mocalum:
         -----
         CT_cfg must contain following keys having values in specific type:
             - points : numpy
-                 ND numpy array of x, y and z triplets of measurement points
+                 ND array of x, y and z triplets of measurement points
             - no_scans : int, optional
                  Number of PPI scans must be equal or bigger than 1
-            - max_speed : int
-                 Max permitted angular speed
-            - max_acc : int
-                 Max permitted angular acceleration
-            - acq_time : int
-                 Acquisition time to acquire LOS measurements
+            - max_speed : int, optional
+                 Max permitted angular speed, by default 50 (deg/s)
+            - max_acc : int, optional
+                 Max permitted angular acceleration, by default 100 (deg/s^2)
+            - acq_time : int, optional
+                 Acquisition time to acquire LOS measurements, by default 1 (s)
             - sync : boolean, optional
-                 Whether to synchronization or not trajectory among lidars
-            - sweep : boolean, optional
-                 Whether lidars sweep or step through measurement points
+                 Whether to synchronization or not trajectory among lidars,
+                 by default True
         """
-        # print('Not yet implemented')
+        #TODO: Implement sweeping trajectories in future
+
         meas_pts = CT_cfg['points']
-        no_scans = CT_cfg['no_scans']
-        max_speed = CT_cfg['max_speed']
-        max_acc = CT_cfg['max_acc']
-        acq_time = CT_cfg['acq_time']
-        # sync = CT_cfg['sync']
-        # sweep = CT_cfg['sweep']
+        no_los = len(meas_pts)
+        no_scans = CT_cfg['no_scans']  if 'no_scans' in CT_cfg else 1
+        max_speed = CT_cfg['max_speed']  if 'max_speed' in CT_cfg else 50
+        max_acc = CT_cfg['max_acc']  if 'max_acc' in CT_cfg else 100
+        acq_time = CT_cfg['acq_time']  if 'acq_time' in CT_cfg else 1
+        sync = CT_cfg['sync']  if 'sync' in CT_cfg else True
+        sweep = CT_cfg['sweep']  if 'sweep' in CT_cfg else False
 
-        lidar_pos = self.data.meas_cfg[lidar_id]['position']
-        beam_coord = generate_beam_coords(lidar_pos, meas_pts)
-
-        az = beam_coord[:,0]
-        el = beam_coord[:,1]
-        rng = beam_coord[:,2]
-        no_los = len(az)
-
-        _ , _, displacement = trajectory2displacement(lidar_pos, meas_pts)
-        max_displacement = np.max(displacement, axis = 1)
-
-        traj_timing = displacement2time(max_displacement, max_speed, max_acc)
-        avg_scan_speed = np.mean(max_displacement/traj_timing)
-
-        sweep_time = traj_timing[0]
-        traj_timing[0] = 0
+        # here we need loop on lidar_ids
+        if type(lidar_id) == str:
+            if lidar_id not in self.data.meas_cfg:
+                raise ValueError('lidar id(s) does not exist !')
+            else:
+                lidar_id = [lidar_id]
+        elif type(lidar_id) == list or type(lidar_id) == np.ndarray:
+            for id in lidar_id:
+                if id not in self.data.meas_cfg:
+                    raise ValueError('lidar id(s) does not exist !')
 
 
-
-        traj_timing = np.cumsum(traj_timing + acq_time)
-        scan_time = traj_timing[-1]
-
-
-        time = np.tile(traj_timing, no_scans)
-        to_add = np.repeat(scan_time + sweep_time, no_scans*no_los)
-        multip = np.repeat(np.arange(0,no_scans), no_los)
-        time = time + multip*to_add
+        az = np.empty((len(lidar_id), len(meas_pts)))
+        el = np.empty((len(lidar_id), len(meas_pts)))
+        rng = np.empty((len(lidar_id), len(meas_pts)))
+        max_displacement = np.empty((len(lidar_id), len(meas_pts)))
+        traj_timing = np.empty((len(lidar_id), len(meas_pts)))
 
 
-        # create measurement configuration dictionary
-        self.data._upd8_meas_cfg(lidar_id, 'CT', az, el, rng, no_los, no_scans,
-                                avg_scan_speed, max_displacement.max(),
-                                traj_timing[-1], sweep_time,
-                                max_speed, max_acc)
+        for i, id in enumerate(lidar_id):
+
+            info_dict = self._single_lidar_ct_traj(id, CT_cfg)
+            az[i] = info_dict['az']
+            el[i] = info_dict['el']
+            rng[i] = info_dict['rng']
+            max_displacement[i] = info_dict['max_displacement']
+            traj_timing[i] = info_dict['traj_timing']
+
+        max_time = traj_timing.max(axis = 0)
+
+        for i in range(0,len(traj_timing)):
+            traj_timing[i] = max_time if sync == True else traj_timing[i]
+
+            avg_scan_speed = np.mean(max_displacement[i]/traj_timing[i])
+            sweep_time = traj_timing[i][0]
+            traj_timing[i][0] = 0
+
+            traj_timing[i] = np.cumsum(traj_timing[i] + acq_time)
+            scan_time = traj_timing[i][-1]
+            time = np.tile(traj_timing[i], no_scans)
+            to_add = np.repeat(scan_time + sweep_time, no_scans*no_los)
+            multip = np.repeat(np.arange(0,no_scans), no_los)
+            time = time + multip*to_add
+
+            # create measurement configuration dictionary
+            self.data._upd8_meas_cfg(lidar_id[i], 'CT', az[i], el[i], rng[i],
+                                     no_los, no_scans, avg_scan_speed,
+                                     max_displacement[i].max(),
+                                     traj_timing[i][-1], sweep_time, max_speed,
+                                     max_acc)
 
 
-        # tile probing coordinates to match no of scans
-        az = np.tile(az, no_scans)
-        rng = np.tile(rng, no_scans)
-        el = np.tile(el, no_scans)
+            # tile probing coordinates to match no of scans
+            az_tiled = np.tile(az[i], no_scans)
+            rng_tiled = np.tile(rng[i], no_scans)
+            el_tiled = np.tile(el[i], no_scans)
 
-        # create probing dataset later to be populated with probing unc
-        self.data._cr8_probing_ds(lidar_id, az, el, rng, time)
+            # create probing dataset later to be populated with probing unc
+            self.data._cr8_probing_ds(lidar_id[i], az_tiled,
+                                      rng_tiled, el_tiled, time)
 
-        # adding xyz (these will not have uncertainties)
-        self._calc_xyz(lidar_id)
+            # adding xyz (these will not have uncertainties)
+            self._calc_xyz(lidar_id[i])
 
-        # # create flow field bounding box dict
-        self._cr8_bbox_meas_pts(lidar_id)
+            # # create flow field bounding box dict
+            self._cr8_bbox_meas_pts(lidar_id[i])
 
 
     # Methods related to generation of uncertainties
