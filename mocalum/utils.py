@@ -4,6 +4,64 @@ import xarray as xr
 from math import degrees, atan2
 # from .persistance import data
 
+
+def generate_beam_coords(lidar_pos, meas_pt_pos):
+    """
+    Generates beam steering coordinates in spherical coordinate system.
+
+    Parameters
+    ----------
+    lidar_pos : ndarray
+        1D array containing data with `float` or `int` type corresponding to
+        Northing, Easting and Height coordinates of a lidar.
+        Coordinates unit is meter.
+    meas_pt_pos : ndarray
+        nD array containing data with `float` or `int` type corresponding to
+        Northing, Easting and Height coordinates of a measurement point(s).
+        Coordinates unit is meter.
+
+    Returns
+    -------
+    beam_coords : ndarray
+        nD array containing beam steering coordinates for given measurement points.
+        Coordinates have following structure [azimuth, elevation, range].
+        Azimuth and elevation angles are given in degree.
+        Range unit is meter.
+    """
+    # testing if  meas_pt has single or multiple measurement points
+    if len(meas_pt_pos.shape) == 2:
+        x_array = meas_pt_pos[:, 0]
+        y_array = meas_pt_pos[:, 1]
+        z_array = meas_pt_pos[:, 2]
+    else:
+        x_array = np.array([meas_pt_pos[0]])
+        y_array = np.array([meas_pt_pos[1]])
+        z_array = np.array([meas_pt_pos[2]])
+
+
+    # calculating difference between lidar_pos and meas_pt_pos coordiantes
+    dif_xyz = np.array([lidar_pos[0] - x_array, lidar_pos[1] - y_array, lidar_pos[2] - z_array])
+
+    # distance between lidar and measurement point in space
+    distance_3D = np.sum(dif_xyz**2,axis=0)**(1./2)
+
+    # distance between lidar and measurement point in a horizontal plane
+    distance_2D = np.sum(np.abs([dif_xyz[0],dif_xyz[1]])**2,axis=0)**(1./2)
+
+    # in radians
+    azimuth = np.arctan2(x_array-lidar_pos[0], y_array-lidar_pos[1])
+    # conversion to metrological convention
+    azimuth = (360 + azimuth * (180 / np.pi)) % 360
+
+    # in radians
+    elevation = np.arccos(distance_2D / distance_3D)
+    # conversion to metrological convention
+    elevation = np.sign(z_array - lidar_pos[2]) * (elevation * (180 / np.pi))
+
+    beam_coord = np.transpose(np.array([azimuth, elevation, distance_3D]))
+
+    return beam_coord
+
 def spher2cart(azimuth, elevation, radius):
     """Converts spherical coordinates to Cartesian coordinates
 
@@ -43,6 +101,117 @@ def spher2cart(azimuth, elevation, radius):
     except:
         raise TypeError('Dimensions of inputs are not the same!')
 
+
+def trajectory2displacement(lidar_pos, trajectory, rollover = True):
+    """
+    Converts trajectory described in a Cartesian coordinate system to
+    angular positions of the lidar scanner heads.
+
+    Parameters
+    ----------
+    lidar_pos : ndarray
+        nD array containing the lidar position in a Cartesian
+        coordinate system.
+    trajectory : ndarray
+        nD array containing trajectory points in a Cartesian
+        coordinateys system.
+    rollover : boolean
+        Indicates whether the lidar motion controller has
+        a rollover capability.
+        The default value is set to True.
+
+    Returns
+    -------
+    angles_start : ndarray
+        nD array containing the starting position of the scanner head.
+    angles_stop : ndarray
+        nD array containing the ending position of the scanner head.
+    angular_displacement : ndarray
+        nD array containing angular displacements that the motion system
+        needs to perform when moving from one to another trajectory point.
+    """
+
+    NO_DIGITS = 2
+    angles_start = generate_beam_coords(lidar_pos, np.roll(trajectory, 1, axis = 0))[:, (0,1)]
+    angles_stop = generate_beam_coords(lidar_pos, np.roll(trajectory, 0, axis = 0))[:, (0,1)]
+
+    angular_displacement = abs(angles_start - angles_stop)
+
+
+    ind_1 = np.where((angular_displacement[:, 0] > 180) &
+                     (abs(360 - angular_displacement[:, 0]) <= 180))
+
+    ind_2 = np.where((angular_displacement[:, 0] > 180) &
+                     (abs(360 - angular_displacement[:, 0]) > 180))
+
+    angular_displacement[:, 0][ind_1] = 360 - angular_displacement[:, 0][ind_1]
+    angular_displacement[:, 0][ind_2] = 360 + angular_displacement[:, 0][ind_2]
+
+
+    ind_1 = np.where((angular_displacement[:, 1] > 180) &
+                     (abs(360 - angular_displacement[:, 1]) <= 180))
+    ind_2 = np.where((angular_displacement[:, 1] > 180) &
+                     (abs(360 - angular_displacement[:, 1]) > 180))
+    angular_displacement[:, 1][ind_1] = 360 - angular_displacement[:, 1][ind_1]
+    angular_displacement[:, 1][ind_2] = 360 + angular_displacement[:, 1][ind_2]
+    return np.round(angles_start, NO_DIGITS), \
+           np.round(angles_stop, NO_DIGITS), \
+           np.abs(angular_displacement)
+
+
+
+def displacement2time(displacement, Amax, Vmax):
+    """
+    Calculates minimum move time to perform predefined angular motions.
+
+    Parameters
+    ----------
+    displacement : ndarray
+        nD array containing angular displacements
+        that a motion system needs to perform.
+        The displacements unit depends on the units of Amax and Vmax.
+        Typically the unit is in degrees.
+    Amax : float
+        Maximum permited acceleration of the motion system.
+        Typically the unit for Amax is degrees/s^2 .
+    Vmax : float
+        Maximum permited velocity of the motion system (aka rated speed).
+        Typically the unit for Vmas is degree/s .
+
+    Returns
+    -------
+    move_time : ndarray
+        nD array containing minimum move time to perform the diplacements
+        The unit of move_time elements depends on the input parameters.
+        Typically the unit is s (seconds).
+
+    Notes
+    -----
+    Equations used to calculate move time are based on [1],
+    assuming an infinite jerk.
+
+    References
+    ----------
+    .. [1] Peters R. D.: Ideal Lift Kinematics: Complete Equations for
+        Plotting Optimum Motion  Elevator Technology 6,
+        Proceedings of ELEVCON’95, 1995.
+    """
+
+    move_time = np.empty((len(displacement),), dtype=float)
+
+    # find indexes for which the scanner head
+    # will reach maximum velocity (i.e. rated speed)
+    index_a = np.where(displacement > (Vmax**2) / Amax)
+
+    # find indexes for which the scanner head
+    # will not reach maximum velocity (i.e. rated speed)
+    index_b = np.where(displacement <= (Vmax**2) / Amax)
+
+    move_time[index_a] = displacement[index_a] / Vmax + Vmax / Amax
+    move_time[index_b] = 2 * np.sqrt(displacement[index_b] / Amax)
+
+
+    return move_time
 
 
 def project2los(u,v,w, azimuth, elevation, ignore_elevation = True):

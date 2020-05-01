@@ -4,7 +4,7 @@ import xarray as xr
 from .persistance import data
 from .utils import move2time, spher2cart, get_plaw_uvw, project2los, ivap_rc, _rot_matrix
 from .utils import sliding_window_slicing, bbox_pts_from_array, bbox_pts_from_cfg
-from .utils import calc_mean_step, safe_execute
+from .utils import calc_mean_step, safe_execute, generate_beam_coords, trajectory2displacement, displacement2time
 from .samples import gen_unc
 from tqdm import tqdm
 
@@ -191,24 +191,30 @@ class Mocalum:
         ----------
         lidar_id : str
             Id of lidar to be consider for genration of PPI measurement points
-        sector_size : int
-            Size of the scanned sector in degrees
-        azimuth_mid : float, int
-            Central azimuth angle of the PPI scanned arc
-        angular_res : float, int
-            Angular resolution of PPI scan
-        elevation : float, int
-            Elevation angle of PPI scan
-        rng : float, int
-            Range at which measurements should take place
-        no_scans : int, optional
-            Number of PPI scans, by default 1
-        scan_speed : int, optional
-            Angular speed in deg/s, by default 1 deg/s
-        max_speed : int, optional
-            Max  permitted angular speed, by default 50 deg/s
-        max_acc : int, optional
-            Max permitted angular acceleration, by default 100 deg/s^2
+        PPI_cfg : dict
+            Dictionary holding configuration of PPI scan
+
+        Notes
+        -----
+        PPI_cfg must contain following keys having values in specific type:
+            - sector_size : int
+                 Size of the scanned sector in degrees
+            - azimuth_mid : float, int
+                 Central azimuth angle of the PPI scanned arc
+            - angular_res : float, int
+                 Angular resolution of PPI scan
+            - elevation : float, int
+                 Elevation angle of PPI scan
+            - range : float, int
+                 Range at which measurements should take place
+            - no_scans : int, optional
+                 Number of PPI scans must be equal or bigger than 1
+            - scan_speed : int
+                 Angular speed in deg/s
+            - max_speed : int
+                 Max permitted angular speed
+            - max_acc : int
+                 Max permitted angular acceleration
 
         """
 
@@ -245,7 +251,7 @@ class Mocalum:
 
         # create measurement configuration dictionary
         self.data._upd8_meas_cfg(lidar_id, 'PPI', az, el, rng, no_los, no_scans,
-                                scan_speed, sector_size, sweep_time,
+                                scan_speed, sector_size, no_los*scan_speed,sweep_time,
                                 max_speed, max_acc)
 
         # tile probing coordinates to match no of scans
@@ -270,22 +276,95 @@ class Mocalum:
         # # create flow field bounding box dict
         self._cr8_bbox_meas_pts(lidar_id)
 
-    def generate_complex_scan(lidar_id, meas_pts, sync=True):
+    def generate_complex_trajectory(self, lidar_id, CT_cfg):
         """
         Generate probing DataSet(s) for selected lidars and given measurement
         points
 
+
         Parameters
         ----------
-        lidar_id : str, list or numpy
-            Lidar id(s) for which probing DataSet(s) will be created
-        meas_pts : numpy
-            3D numpy array of measurement point coordinates
-        sync : boolean, optional
-            Synchronization flag, indicates whether timing of scans should be
-            synchronized (True) or not (False), by default True
+        lidar_id : str
+            Id of lidar to be consider for genration of PPI measurement points
+        CT_cfg : dict
+            Dictionary holding configuration of complex trajectory
+
+        Notes
+        -----
+        CT_cfg must contain following keys having values in specific type:
+            - points : numpy
+                 ND numpy array of x, y and z triplets of measurement points
+            - no_scans : int, optional
+                 Number of PPI scans must be equal or bigger than 1
+            - max_speed : int
+                 Max permitted angular speed
+            - max_acc : int
+                 Max permitted angular acceleration
+            - acq_time : int
+                 Acquisition time to acquire LOS measurements
+            - sync : boolean, optional
+                 Whether to synchronization or not trajectory among lidars
+            - sweep : boolean, optional
+                 Whether lidars sweep or step through measurement points
         """
-        print('Not yet implemented')
+        # print('Not yet implemented')
+        meas_pts = CT_cfg['points']
+        no_scans = CT_cfg['no_scans']
+        max_speed = CT_cfg['max_speed']
+        max_acc = CT_cfg['max_acc']
+        acq_time = CT_cfg['acq_time']
+        # sync = CT_cfg['sync']
+        # sweep = CT_cfg['sweep']
+
+        lidar_pos = self.data.meas_cfg[lidar_id]['position']
+        beam_coord = generate_beam_coords(lidar_pos, meas_pts)
+
+        az = beam_coord[:,0]
+        el = beam_coord[:,1]
+        rng = beam_coord[:,2]
+        no_los = len(az)
+
+        _ , _, displacement = trajectory2displacement(lidar_pos, meas_pts)
+        max_displacement = np.max(displacement, axis = 1)
+
+        traj_timing = displacement2time(max_displacement, max_speed, max_acc)
+        avg_scan_speed = np.mean(max_displacement/traj_timing)
+
+        sweep_time = traj_timing[0]
+        traj_timing[0] = 0
+
+
+
+        traj_timing = np.cumsum(traj_timing + acq_time)
+        scan_time = traj_timing[-1]
+
+
+        time = np.tile(traj_timing, no_scans)
+        to_add = np.repeat(scan_time + sweep_time, no_scans*no_los)
+        multip = np.repeat(np.arange(0,no_scans), no_los)
+        time = time + multip*to_add
+
+
+        # create measurement configuration dictionary
+        self.data._upd8_meas_cfg(lidar_id, 'CT', az, el, rng, no_los, no_scans,
+                                avg_scan_speed, max_displacement.max(),
+                                traj_timing[-1], sweep_time,
+                                max_speed, max_acc)
+
+
+        # tile probing coordinates to match no of scans
+        az = np.tile(az, no_scans)
+        rng = np.tile(rng, no_scans)
+        el = np.tile(el, no_scans)
+
+        # create probing dataset later to be populated with probing unc
+        self.data._cr8_probing_ds(lidar_id, az, el, rng, time)
+
+        # adding xyz (these will not have uncertainties)
+        self._calc_xyz(lidar_id)
+
+        # # create flow field bounding box dict
+        self._cr8_bbox_meas_pts(lidar_id)
 
 
     # Methods related to generation of uncertainties

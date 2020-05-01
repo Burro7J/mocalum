@@ -232,7 +232,7 @@ class Data:
 
 
     def _upd8_meas_cfg(self, lidar_id, scan_type, az, el, rng, no_los,
-                      no_scans, scn_speed, sectrsz, rtn_tm, max_speed, max_acc):
+                      no_scans, scn_speed, sectrsz, scn_tm, rtn_tm, max_speed, max_acc):
 
 
 
@@ -243,7 +243,7 @@ class Data:
         self.meas_cfg[lidar_id]['config'].update({'no_los':no_los})
         self.meas_cfg[lidar_id]['config'].update({'no_scans':no_scans})
         self.meas_cfg[lidar_id]['config'].update({'sectrsz':sectrsz})
-        self.meas_cfg[lidar_id]['config'].update({'scn_tm':sectrsz*scn_speed})
+        self.meas_cfg[lidar_id]['config'].update({'scn_tm':scn_tm})
         self.meas_cfg[lidar_id]['config'].update({'rtn_tm':rtn_tm})
         self.meas_cfg[lidar_id]['config'].update({'az':az})
         self.meas_cfg[lidar_id]['config'].update({'el':el})
