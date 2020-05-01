@@ -276,6 +276,40 @@ class Mocalum:
         self._cr8_bbox_meas_pts(lidar_id)
 
     def _single_lidar_ct_traj(self, lidar_id, CT_cfg):
+        """
+        Generate probing parameters for generate_complex_trajectory method
+
+        Parameters
+        ----------
+        lidar_id : str
+            Id of lidar to be consider for genration of PPI measurement points
+        CT_cfg : dict
+            Dictionary holding configuration of complex trajectory
+
+        Notes
+        -----
+        CT_cfg must contain following keys having values in specific type:
+            - points : numpy
+                 ND array of x, y and z triplets of measurement points
+            - no_scans : int, optional
+                 Number of PPI scans must be equal or bigger than 1
+            - max_speed : int, optional
+                 Max permitted angular speed, by default 50 (deg/s)
+            - max_acc : int, optional
+                 Max permitted angular acceleration, by default 100 (deg/s^2)
+            - acq_time : int, optional
+                 Acquisition time to acquire LOS measurements, by default 1 (s)
+            - sync : boolean, optional
+                 Whether to synchronization or not trajectory among lidars,
+                 by default True
+
+        Returns
+        -------
+        dict
+            Dictionary containing key-value pairs for azimuth, elevation,
+            range, maximum angular displacement and trajectory timing
+        """
+
         meas_pts = CT_cfg['points']
         no_scans = CT_cfg['no_scans']
         max_speed = CT_cfg['max_speed']
