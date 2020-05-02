@@ -931,7 +931,16 @@ class Mocalum:
 
     # Methods related to reconstruction of wind vector from los measurements
     #
-    def _IVAP_reconstruction(self, lidar_id, no_scans_avg=None):
+    @staticmethod
+    def _scan_average(a, no_los, no_scans, no_avg):
+        a_avg = a.values.reshape(no_scans,no_los).reshape(int(no_scans/no_avg),
+                                                          no_avg,
+                                                          no_los).mean(axis=1)
+
+        return a_avg.flatten()
+
+
+    def _IVAP_reconstruction(self, lidar_id, no_scans_avg):
         """
         IVAP wind reconstruction method
 
@@ -1005,7 +1014,7 @@ class Mocalum:
             raise ValueError('This is not triple-Doppler setup')
 
 
-    def _dual_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
+    def _dual_Doppler_reconstruction(self, lidar_id, no_scans_avg):
         """
         Dual Doppler reconstruction of wind vector
 
@@ -1022,19 +1031,31 @@ class Mocalum:
         no_los = self.data.meas_cfg[lidar_id[0]]['config']['no_los']
         no_scans = self.data.meas_cfg[lidar_id[0]]['config']['no_scans']
 
-        az = np.empty((2, no_los*no_scans))
-        el = np.empty((2, no_los*no_scans))
-        los = np.empty((2, no_los*no_scans))
+        if type(no_scans_avg) == int and (no_scans % no_scans_avg == 0):
+            az = np.empty((2, int(no_los*no_scans/no_scans_avg)))
+            el = np.empty((2, int(no_los*no_scans/no_scans_avg)))
+            los = np.empty((2, int(no_los*no_scans/no_scans_avg)))
 
-        for i,id in enumerate(lidar_id):
-            az[i] = self.data.los[id].az
-            el[i] = self.data.los[id].el
-            los[i] = self.data.los[id].vrad
+            for i,id in enumerate(lidar_id):
+                self.az = self.data.los[id].az
+                az[i] = self._scan_average(self.data.los[id].az, no_los,
+                                           no_scans, no_scans_avg)
+                el[i] = self._scan_average(self.data.los[id].el, no_los,
+                                           no_scans, no_scans_avg)
+                los[i] = self._scan_average(self.data.los[id].vrad, no_los,
+                                           no_scans, no_scans_avg)
 
-        # here we should introduce averaging according to no of scans
-        self.az = az
-        self.el = el
-        self.los = los
+        else:
+            az = np.empty((2, no_los*no_scans))
+            el = np.empty((2, no_los*no_scans))
+            los = np.empty((2, no_los*no_scans))
+
+            for i,id in enumerate(lidar_id):
+                self.az = self.data.los[id].az
+                az[i] = self.data.los[id].az
+                el[i] = self.data.los[id].el
+                los[i] = self.data.los[id].vrad
+
 
         u, v, ws, wdir = dd_rc_array(los, az, el, 1)
 
@@ -1042,7 +1063,7 @@ class Mocalum:
 
 
 
-    def _triple_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
+    def _triple_Doppler_reconstruction(self, lidar_id, no_scans_avg):
         """
         Triple Doppler reconstruction of wind vector
 
@@ -1086,10 +1107,10 @@ class Mocalum:
         """
 
         if rc_method == 'IVAP':
-            self._IVAP_reconstruction(lidar_id)
+            self._IVAP_reconstruction(lidar_id,no_scans_avg)
         elif rc_method == 'dual-Doppler':
-            self._dual_Doppler_reconstruction(lidar_id)
+            self._dual_Doppler_reconstruction(lidar_id,no_scans_avg)
         elif rc_method == 'triple-Doppler':
-            self._triple_Doppler_reconstruction(lidar_id)
+            self._triple_Doppler_reconstruction(lidar_id,no_scans_avg)
         else:
             print('Unsupported wind reconstruction method')
