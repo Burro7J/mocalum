@@ -950,15 +950,129 @@ class Mocalum:
                                     self.data.los[lidar_id].no_scans.values))
         azm = np.asarray(np.split(self.data.los[lidar_id].az.values,
                                     self.data.los[lidar_id].no_scans.values))
-        u, v, ws = ivap_rc(vrad, azm, 1)
+        u, v, ws, wdir = ivap_rc(vrad, azm, 1)
 
-        self.data._cr8_rc_wind_ds(lidar_id, u,v,ws)
+        self.data._cr8_rc_wind_ds('single-Doppler IVAP', u,v,ws,wdir)
+
+    def _is_dual_Doppler(self, lidar_id):
+        """
+        Checks if provided lidar ids are valid prior reconstruction
+
+        Parameters
+        ----------
+        lidar_id : list, numpy
+            ID of two lidars provided as list or np array of strings
+        """
+        if not(type(lidar_id) == list or type(lidar_id) == np.ndarray):
+            raise TypeError('lidar_id must be list or 1D numpy array!')
+        elif not(len(lidar_id) == 2):
+            raise ValueError('lidar_id must have two string elements')
+        cfg = self.data.meas_cfg
+        for id in lidar_id:
+            if id not in cfg:
+                raise ValueError('lidar id(s) does not exist!')
+
+        total_los_1 = cfg[lidar_id[0]]['config']['no_los'] * cfg[lidar_id[0]]['config']['no_scans']
+        total_los_2 = cfg[lidar_id[1]]['config']['no_los'] * cfg[lidar_id[1]]['config']['no_scans']
+
+        if total_los_1!=total_los_2:
+            raise ValueError('This is not dual-Doppler setup')
+
+
+    def _is_triple_Doppler(self, lidar_id):
+        """
+        Checks if provided lidar ids are valid prior reconstruction
+
+        Parameters
+        ----------
+        lidar_id : list, numpy
+            ID of three lidars provided as list or np array of strings
+        """
+        if not(type(lidar_id) == list or type(lidar_id) == np.ndarray):
+            raise TypeError('lidar_id must be list or 1D numpy array!')
+        elif not(len(lidar_id) == 3):
+            raise ValueError('lidar_id must have two string elements')
+        cfg = self.data.meas_cfg
+        for id in lidar_id:
+            if id not in cfg:
+                raise ValueError('lidar id(s) does not exist!')
+
+        total_los_1 = cfg[lidar_id[0]]['config']['no_los'] * cfg[lidar_id[0]]['config']['no_scans']
+        total_los_2 = cfg[lidar_id[1]]['config']['no_los'] * cfg[lidar_id[1]]['config']['no_scans']
+        total_los_3 = cfg[lidar_id[2]]['config']['no_los'] * cfg[lidar_id[2]]['config']['no_scans']
+
+        if total_los_1!=total_los_2:
+            raise ValueError('This is not triple-Doppler setup')
+
 
     def _dual_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
-        print('Not yet implemented')
+        """
+        Dual Doppler reconstruction of wind vector
+
+        Parameters
+        ----------
+        lidar_id : list, numpy
+            ID of two lidars provided as list or np array of strings
+        no_scans_avg : int, optional
+            Number of complete scans to average prior reconstruction,
+            by default None reconstruction without averaging
+        """
+
+        self._is_dual_Doppler(lidar_id)
+        no_los = self.data.meas_cfg[lidar_id[0]]['config']['no_los']
+        no_scans = self.data.meas_cfg[lidar_id[0]]['config']['no_scans']
+
+        az = np.empty((2, no_los*no_scans))
+        el = np.empty((2, no_los*no_scans))
+        los = np.empty((2, no_los*no_scans))
+
+        for i,id in enumerate(lidar_id):
+            az[i] = self.data.los[id].az
+            el[i] = self.data.los[id].el
+            los[i] = self.data.los[id].vrad
+
+        # here we should introduce averaging according to no of scans
+        self.az = az
+        self.el = el
+        self.los = los
+
+        u, v, ws, wdir = dd_rc_array(los, az, el, 1)
+
+        self.data._cr8_rc_wind_ds('dual-Doppler CT', u,v,ws,wdir)
+
+
 
     def _triple_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
-        print('Not yet implemented')
+        """
+        Triple Doppler reconstruction of wind vector
+
+        Parameters
+        ----------
+        lidar_id : list, numpy
+            ID of three lidars provided as list or np array of strings
+        no_scans_avg : int, optional
+            Number of complete scans to average prior reconstruction,
+            by default None reconstruction without averaging
+        """
+
+        self._is_triple_Doppler(lidar_id)
+        no_los = self.data.meas_cfg[lidar_id[0]]['config']['no_los']
+        no_scans = self.data.meas_cfg[lidar_id[0]]['config']['no_scans']
+
+        az = np.empty((3, no_los*no_scans))
+        el = np.empty((3, no_los*no_scans))
+        los = np.empty((3, no_los*no_scans))
+
+        for i,id in enumerate(lidar_id):
+            az[i] = self.data.los[id].az
+            el[i] = self.data.los[id].el
+            los[i] = self.data.los[id].vrad
+
+        # here we should introduce averaging according to no of scans
+
+        u, v, w, ws, wdir = td_rc_array(los, az, el, 1)
+
+        self.data._cr8_rc_wind_ds('triple-Doppler CT', u,v,ws,wdir, w)
 
     def reconstruct_wind(self, lidar_id, rc_method = 'IVAP', no_scans_avg=None):
         """Reconstructs wind speed according to the selected retrieval method

@@ -295,7 +295,9 @@ def ivap_rc(los, azimuth, ax = 0):
     u = (F*B - E*C) / D
     wind_speed = np.sqrt(u**2 + v**2)
 
-    return u, v, wind_speed
+    wind_dir = (90 - np.arctan2(-v,-u)* (180 / np.pi)) % 360
+
+    return u, v, wind_speed, wind_dir
 
 def dd_rc_single(los, azimuth):
     """Calculates u and v components by using IVAP algo on set of LOS speed
@@ -379,12 +381,12 @@ def dd_rc_array(los, azimuth, elevation, rc_type = 1):
 
     inv_R = np.linalg.inv(R.T)
 
-    uvw_array = np.einsum('ijk,ik->ij', inv_R,los)
+    uvw_array = np.einsum('ijk,ik->ij', inv_R,los.T)
 
     V_h_array = np.sqrt(uvw_array[:,0]**2 + uvw_array[:,1]**2)
 
     wind_dir_array = (90 - np.arctan2(-uvw_array[:,1],-uvw_array[:,0])* (180 / np.pi)) % 360
-    return V_h_array, wind_dir_array
+    return uvw_array[:,0], uvw_array[:,1], V_h_array, wind_dir_array
 
 
 def td_rc_array(los, azimuth, elevation, rc_type = 1):
@@ -403,12 +405,12 @@ def td_rc_array(los, azimuth, elevation, rc_type = 1):
 
     inv_R = np.linalg.inv(R.T)
 
-    uvw_array = np.einsum('ijk,ik->ij', inv_R,los)
+    uvw_array = np.einsum('ijk,ik->ij', inv_R,los.T)
 
     V_h_array = np.sqrt(uvw_array[:,0]**2 + uvw_array[:,1]**2)
 
     wind_dir_array = (90 - np.arctan2(-uvw_array[:,1],-uvw_array[:,0])* (180 / np.pi)) % 360
-    return V_h_array, wind_dir_array
+    return uvw_array[:,0], uvw_array[:,1], uvw_array[:,2], V_h_array, wind_dir_array
 
 
 def move2time(displacement, Amax, Vmax):

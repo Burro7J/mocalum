@@ -343,17 +343,28 @@ class Data:
 
         self.los.update({lidar_id:los})
 
-    def _cr8_rc_wind_ds(self, lidar_id, u, v, ws):
-        self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
-                                   'u': (['scan'], u),
-                                   'v': (['scan'], v)
-                                   },coords={'scan': np.arange(1,len(u)+1, 1)})
+    def _cr8_rc_wind_ds(self, scan_type, u, v, ws, wdir, w = None):
+
+        if type(w) != type(None):
+            self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
+                                    'wdir':(['scan'], wdir),
+                                    'u': (['scan'], u),
+                                    'v': (['scan'], v),
+                                    'w': (['scan'], w)
+                                    },coords={'scan': np.arange(1,len(u)+1, 1)})
+        else:
+            self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
+                                    'wdir':(['scan'], wdir),
+                                    'u': (['scan'], u),
+                                    'v': (['scan'], v)
+                                    },coords={'scan': np.arange(1,len(u)+1, 1)})
+
 
 
         # adding/updating metadata
         self.rc_wind = self._add_metadata(self.rc_wind, metadata,
                                       'Reconstructed wind')
-        self.rc_wind.attrs['scan_type'] = self.meas_cfg[lidar_id]['config']['scan_type']
+        self.rc_wind.attrs['scan_type'] = scan_type
 
     def _get_ffield_coords(self, id):
         bbox_cfg=self.bbox_ffield[id]
