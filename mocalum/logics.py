@@ -955,11 +955,25 @@ class Mocalum:
 
         # need first to average scans prior splitting for reconstruction
 
-        vrad = np.asarray(np.split(self.data.los[lidar_id].vrad.values,
-                                    self.data.los[lidar_id].no_scans.values))
-        azm = np.asarray(np.split(self.data.los[lidar_id].az.values,
-                                    self.data.los[lidar_id].no_scans.values))
-        u, v, ws, wdir = ivap_rc(vrad, azm, 1)
+        no_los = self.data.meas_cfg[lidar_id]['config']['no_los']
+        no_scans = self.data.meas_cfg[lidar_id]['config']['no_scans']
+
+        if type(no_scans_avg) == int and (no_scans % no_scans_avg == 0):
+            no_scans_new = int(no_scans/no_scans_avg)
+            az= self._scan_average(self.data.los[lidar_id].az, no_los,
+                                   no_scans, no_scans_avg).reshape(no_scans_new, no_los)
+            el= self._scan_average(self.data.los[lidar_id].el, no_los,
+                                   no_scans, no_scans_avg).reshape(no_scans_new, no_los)
+            los= self._scan_average(self.data.los[lidar_id].vrad, no_los,
+                                   no_scans, no_scans_avg).reshape(no_scans_new, no_los)
+
+        else:
+            az= self.data.los[lidar_id].az.values.reshape(no_scans, no_los)
+            el= self.data.los[lidar_id].el.values.reshape(no_scans, no_los)
+            los= self.data.los[lidar_id].vrad.values.reshape(no_scans, no_los)
+
+
+        u, v, ws, wdir = ivap_rc(los, az, 1)
 
         self.data._cr8_rc_wind_ds('single-Doppler IVAP', u,v,ws,wdir)
 
@@ -1037,7 +1051,6 @@ class Mocalum:
             los = np.empty((2, int(no_los*no_scans/no_scans_avg)))
 
             for i,id in enumerate(lidar_id):
-                self.az = self.data.los[id].az
                 az[i] = self._scan_average(self.data.los[id].az, no_los,
                                            no_scans, no_scans_avg)
                 el[i] = self._scan_average(self.data.los[id].el, no_los,
@@ -1080,14 +1093,29 @@ class Mocalum:
         no_los = self.data.meas_cfg[lidar_id[0]]['config']['no_los']
         no_scans = self.data.meas_cfg[lidar_id[0]]['config']['no_scans']
 
-        az = np.empty((3, no_los*no_scans))
-        el = np.empty((3, no_los*no_scans))
-        los = np.empty((3, no_los*no_scans))
+        if type(no_scans_avg) == int and (no_scans % no_scans_avg == 0):
+            az = np.empty((3, int(no_los*no_scans/no_scans_avg)))
+            el = np.empty((3, int(no_los*no_scans/no_scans_avg)))
+            los = np.empty((3, int(no_los*no_scans/no_scans_avg)))
 
-        for i,id in enumerate(lidar_id):
-            az[i] = self.data.los[id].az
-            el[i] = self.data.los[id].el
-            los[i] = self.data.los[id].vrad
+            for i,id in enumerate(lidar_id):
+                self.az = self.data.los[id].az
+                az[i] = self._scan_average(self.data.los[id].az, no_los,
+                                           no_scans, no_scans_avg)
+                el[i] = self._scan_average(self.data.los[id].el, no_los,
+                                           no_scans, no_scans_avg)
+                los[i] = self._scan_average(self.data.los[id].vrad, no_los,
+                                           no_scans, no_scans_avg)
+
+        else:
+            az = np.empty((3, no_los*no_scans))
+            el = np.empty((3, no_los*no_scans))
+            los = np.empty((3, no_los*no_scans))
+
+            for i,id in enumerate(lidar_id):
+                az[i] = self.data.los[id].az
+                el[i] = self.data.los[id].el
+                los[i] = self.data.los[id].vrad
 
         # here we should introduce averaging according to no of scans
 
