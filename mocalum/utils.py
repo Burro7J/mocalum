@@ -297,7 +297,7 @@ def ivap_rc(los, azimuth, ax = 0):
 
     return u, v, wind_speed
 
-def dd_rc(los, azimuth):
+def dd_rc_single(los, azimuth):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -332,7 +332,7 @@ def dd_rc(los, azimuth):
 
 
 
-def td_rc(los, azimuth, elevation):
+def td_rc_single(los, azimuth, elevation):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -363,6 +363,52 @@ def td_rc(los, azimuth, elevation):
     wind_direction = (90 - degrees(atan2(-v, -u))) % 360
 
     return u,v,w, wind_speed, wind_direction
+
+
+def dd_rc_array(los, azimuth, elevation, rc_type = 1):
+
+    azimuth = np.radians(azimuth)
+    elevation = np.radians(elevation)
+
+    if rc_type == 0:
+        R = np.array([[np.sin(azimuth[0]), np.sin(azimuth[1])],
+                      [np.cos(azimuth[0]), np.cos(azimuth[1])]])
+    else:
+        R = np.array([[np.sin(azimuth[0])*np.cos(elevation[0]),np.sin(azimuth[1])*np.cos(elevation[1])],
+                      [np.cos(azimuth[0])*np.cos(elevation[0]),np.cos(azimuth[1])*np.cos(elevation[1])]])
+
+    inv_R = np.linalg.inv(R.T)
+
+    uvw_array = np.einsum('ijk,ik->ij', inv_R,los)
+
+    V_h_array = np.sqrt(uvw_array[:,0]**2 + uvw_array[:,1]**2)
+
+    wind_dir_array = (90 - np.arctan2(-uvw_array[:,1],-uvw_array[:,0])* (180 / np.pi)) % 360
+    return V_h_array, wind_dir_array
+
+
+def td_rc_array(los, azimuth, elevation, rc_type = 1):
+
+    azimuth = np.radians(azimuth)
+    elevation = np.radians(elevation)
+
+    if rc_type == 0:
+        R = np.array([[np.sin(azimuth[0]), np.sin(azimuth[1]), np.sin(azimuth[2])],
+                      [np.cos(azimuth[0]), np.cos(azimuth[1]), np.cos(azimuth[2])],
+                      [np.sin(elevation[0]), np.sin(elevation[1]), np.sin(elevation[2])]])
+    else:
+        R = np.array([[np.sin(azimuth[0])*np.cos(elevation[0]),np.sin(azimuth[1])*np.cos(elevation[1]),np.sin(azimuth[2])*np.cos(elevation[2])],
+                      [np.cos(azimuth[0])*np.cos(elevation[0]),np.cos(azimuth[1])*np.cos(elevation[1]),np.cos(azimuth[2])*np.cos(elevation[2])],
+                      [np.sin(elevation[0]),                   np.sin(elevation[1]),                   np.sin(elevation[2])                   ]])
+
+    inv_R = np.linalg.inv(R.T)
+
+    uvw_array = np.einsum('ijk,ik->ij', inv_R,los)
+
+    V_h_array = np.sqrt(uvw_array[:,0]**2 + uvw_array[:,1]**2)
+
+    wind_dir_array = (90 - np.arctan2(-uvw_array[:,1],-uvw_array[:,0])* (180 / np.pi)) % 360
+    return V_h_array, wind_dir_array
 
 
 def move2time(displacement, Amax, Vmax):

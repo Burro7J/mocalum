@@ -2,9 +2,10 @@ import numpy as np
 from numpy.linalg import inv as inv
 import xarray as xr
 from .persistance import data
-from .utils import move2time, spher2cart, get_plaw_uvw, project2los, ivap_rc, _rot_matrix
+from .utils import move2time, spher2cart, get_plaw_uvw, project2los, _rot_matrix
 from .utils import sliding_window_slicing, bbox_pts_from_array, bbox_pts_from_cfg
 from .utils import calc_mean_step, safe_execute, generate_beam_coords, trajectory2displacement, displacement2time
+from .utils import ivap_rc, dd_rc_array, td_rc_array
 from .samples import gen_unc
 from tqdm import tqdm
 
@@ -172,7 +173,10 @@ class Mocalum:
         z_coord= np.array([self.data.probing[lidar_id].z.min() - self.z_res,
                            self.data.probing[lidar_id].z.max() + self.z_res])
         t_coord = self.data.probing[lidar_id].time.values
-        t_res = calc_mean_step(t_coord)
+        if len(t_coord) > 1:
+            t_res = calc_mean_step(t_coord)
+        else:
+            t_res = 1
         self.t_res = t_res
 
         # create/updated flow field bounding box config dict
@@ -408,7 +412,10 @@ class Mocalum:
         for i in range(0,len(traj_timing)):
             traj_timing[i] = max_time if sync == True else traj_timing[i]
 
-            avg_scan_speed = np.mean(max_displacement[i]/traj_timing[i])
+            if len(max_displacement[i]) == 1:
+                avg_scan_speed = 0
+            else:
+                avg_scan_speed = np.mean(max_displacement[i]/traj_timing[i])
             sweep_time = traj_timing[i][0]
             traj_timing[i][0] = 0
 
@@ -433,8 +440,8 @@ class Mocalum:
             el_tiled = np.tile(el[i], no_scans)
 
             # create probing dataset later to be populated with probing unc
-            self.data._cr8_probing_ds(lidar_id[i], az_tiled,
-                                      rng_tiled, el_tiled, time)
+            self.data._cr8_probing_ds(lidar_id[i], az_tiled,el_tiled,
+                                      rng_tiled, time)
 
             # adding xyz (these will not have uncertainties)
             self._calc_xyz(lidar_id[i])
@@ -536,21 +543,21 @@ class Mocalum:
                 t_res = np.empty(len(lidar_id))
 
                 for i,id in enumerate(lidar_id):
-                    linked_lidars += [lidar_id]
+                    linked_lidars += [id]
                     bbox_meas_pts = self.data.bbox_meas_pts[id]
 
-                    z_min[i]= data.bbox_meas_pts['z']['min']
-                    z_max[i]= data.bbox_meas_pts['z']['max']
-                    z_res[i]= data.bbox_meas_pts['z']['res']
-                    y_min[i]= data.bbox_meas_pts['y']['min']
-                    y_max[i]= data.bbox_meas_pts['y']['max']
-                    y_res[i]= data.bbox_meas_pts['y']['res']
-                    x_min[i]= data.bbox_meas_pts['x']['min']
-                    x_max[i]= data.bbox_meas_pts['x']['max']
-                    x_res[i]= data.bbox_meas_pts['x']['res']
-                    t_min[i]= data.bbox_meas_pts['t']['min']
-                    t_max[i]= data.bbox_meas_pts['t']['max']
-                    t_res[i]= data.bbox_meas_pts['t']['res']
+                    z_min[i]= bbox_meas_pts['z']['min']
+                    z_max[i]= bbox_meas_pts['z']['max']
+                    z_res[i]= bbox_meas_pts['z']['res']
+                    y_min[i]= bbox_meas_pts['y']['min']
+                    y_max[i]= bbox_meas_pts['y']['max']
+                    y_res[i]= bbox_meas_pts['y']['res']
+                    x_min[i]= bbox_meas_pts['x']['min']
+                    x_max[i]= bbox_meas_pts['x']['max']
+                    x_res[i]= bbox_meas_pts['x']['res']
+                    t_min[i]= bbox_meas_pts['t']['min']
+                    t_max[i]= bbox_meas_pts['t']['max']
+                    t_res[i]= bbox_meas_pts['t']['res']
 
                 z_min = z_min.min()
                 z_max = z_max.max()
@@ -839,7 +846,7 @@ class Mocalum:
 
     # Methods related to projection of flow field to measurement points
     #
-    def project_to_los(self, lidar_id, ffield_id):
+    def project_to_los(self, lidar_id, ffield_id, ignore_elevation = True):
         """Projects wind vector on laser beam line-of-sight
 
 
@@ -906,11 +913,14 @@ class Mocalum:
             w = ffield_pts.w
 
         # Projects wind vector on LOS
+        scan_type = self.data.meas_cfg[lidar_id]['config']['scan_type']
+        ignore_elevation = True if scan_type=='PPI' else False
         los = project2los(u,v,w,
                         self.data.probing[lidar_id].az.values +
                         self.data.probing[lidar_id].unc_az.values,
                         self.data.probing[lidar_id].el.values +
-                        self.data.probing[lidar_id].unc_el.values)
+                        self.data.probing[lidar_id].unc_el.values,
+                        ignore_elevation)
 
         # Adds radial velocity estimation uncertainty
         los += self.data.probing[lidar_id].unc_est.values
@@ -950,7 +960,7 @@ class Mocalum:
     def _triple_Doppler_reconstruction(self, lidar_id, no_scans_avg=None):
         print('Not yet implemented')
 
-    def reconstruct_wind(self, lidar_id, rc_method = 'IVAP'):
+    def reconstruct_wind(self, lidar_id, rc_method = 'IVAP', no_scans_avg=None):
         """Reconstructs wind speed according to the selected retrieval method
 
         Parameters
