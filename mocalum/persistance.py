@@ -7,34 +7,30 @@ import numpy as np
 from numpy.linalg import inv as inv
 import xarray as xr
 from tqdm import tqdm
-
+from .utils import sliding_window_slicing, bbox_pts_from_array, bbox_pts_from_cfg
 
 class Data:
     def __init__(self):
-        self.temp_u = None
-        self.temp_v = None
-        self.probing = None
-        self.los = None
-        self.ffield = None
-        self._ffield = None
-        self.rc_wind = None
+        self.probing = {}
+        self.los = {} # should be key-value pairs
+        self.ffield = None # should be key-value pairs
+        self._ffield = None # should be key-value pairs
+        self.rc_wind = None # should be key-value pairs
         self.fmodel_cfg = {}
         self.meas_cfg = {}
-        self.ffield_bbox_cfg = {}
-        self.unc_cfg = {'azimuth':{'mu':0, 'std':0.1},
-                        'elevation':{'mu':0, 'std':0.1},
-                        'range':{'mu':0, 'std':10},
-                        'estimation':{'mu':0, 'std':0.1},
-                        'corr_coef':0}
+        self.bbox_meas_pts = {}
+        self.bbox_ffield = {}
+        self.ffield_bbox_cfg = {} # should be a dict with lidar_id as key!
+
 
     def _cr8_fmodel_cfg(self, cfg):
         self.fmodel_cfg = cfg
 
 
-    def _cr8_bbox_dict(self, CRS,
+    def _cr8_bbox_dict(self, type, key, CRS,
                        x_coord, y_coord, z_coord,t_coord,
                        x_offset, y_offset, z_offset,t_offset,
-                       x_res, y_res, z_res, t_res):
+                       x_res, y_res, z_res, t_res, **kwargs):
 
         bbox_cfg = {}
 
@@ -65,24 +61,23 @@ class Data:
                               'offset':t_offset,
                               'res':t_res}})
 
-        self.ffield_bbox_cfg = bbox_cfg
+        if type == 'lidar':
+            self.bbox_meas_pts.update({key:bbox_cfg})
+        else:
+            bbox_cfg.update({'linked_lidars':kwargs['linked_lidars']})
+            self.bbox_ffield.update({key:bbox_cfg})
 
 
+    def _cr8_3d_tfield_ds(self, id, turb_df):
 
-    def _cr8_3d_tfield_ds(self, turb_df):
-
-        _ , y, z, t = self._get_ffield_coords()
+        _ , y, z, t = self._get_ffield_coords(id)
 
         turb_np = turb_df.to_numpy().transpose().ravel()
         turb_np = turb_np.reshape(int(len(turb_np)/len(t)), len(t))
 
-        self.temp_u = turb_np[0::3]
-        self.temp_v = turb_np[1::3]
-
-
 
         # -1 to aligned properly axis
-        R_tb = -self.ffield_bbox_cfg['CRS']['rot_matrix']
+        R_tb = -self.bbox_ffield[id]['CRS']['rot_matrix']
 
         # rotate u and v component to be Eastward and Northward wind
         # according to the met conventions
@@ -94,12 +89,6 @@ class Data:
         u = uv[0].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
         v = uv[1].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
         w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-
-        # before rotation
-        # u = turb_np[0::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-        # v = turb_np[1::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-        # w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-
 
         self.ffield = xr.Dataset({'u': (['z', 'y', 'time'], u),
                                   'v': (['z', 'y', 'time'], v),
@@ -114,19 +103,37 @@ class Data:
                                          'Turbulent flow field dataset')
         self.ffield.attrs['generator'] = 'PyConTurb'
 
-    def _cr8_4d_tfield_ds(self, u, v, w, x, t):
+    def _cr8_4d_tfield_ds(self, id):
 
         self._ffield = self.ffield
-        R_tb = self.ffield_bbox_cfg['CRS']['rot_matrix']
+        R_tb = self.bbox_ffield[id]['CRS']['rot_matrix']
         y = self.ffield.y.values
         z = self.ffield.z.values
 
-        # # make Easting, Northing coordinates:
-        # east_north = np.array([x,y]).transpose().dot(inv(R_tb))
-        # east = east_north[:,0]
-        # north = east_north[:,1]
+
+        ws = self.fmodel_cfg['wind_speed']
+        bbox_pts = bbox_pts_from_cfg(self.bbox_ffield[id])
+        t_res = self.bbox_ffield[id]['t']['res']
+
+        x_start_pos = bbox_pts[:,0].min()
+        x_len = abs(bbox_pts[:,0].max() - bbox_pts[:,0].min())
+        x_res = ws * t_res
+        no_items = int(np.ceil(x_len / x_res)) + 1
+
+        u_3d = self.ffield.u.values.transpose()
+        v_3d = self.ffield.v.values.transpose()
+        w_3d = self.ffield.w.values.transpose()
+
+        u_4d = sliding_window_slicing(u_3d, no_items, item_type=1).transpose(0,3,2,1)
+        v_4d = sliding_window_slicing(v_3d, no_items, item_type=1).transpose(0,3,2,1)
+        w_4d = sliding_window_slicing(w_3d, no_items, item_type=1).transpose(0,3,2,1)
+
+        t = np.arange(0, u_4d.shape[0]*t_res, t_res)
+        x = np.arange(0, no_items*x_res, x_res) + x_start_pos
+
 
         ew = np.empty((len(x),len(y),2))
+
 
 
         for i in range(0,len(x)):
@@ -134,9 +141,9 @@ class Data:
                 ew[i,j] = np.array([x[i],y[j]]).dot(inv(R_tb))
 
 
-        self.ffield = xr.Dataset({'u': (['time', 'z', 'y', 'x'], u),
-                                     'v': (['time', 'z', 'y', 'x'], v),
-                                     'w': (['time', 'z', 'y', 'x'], w)},
+        self.ffield = xr.Dataset({'u': (['time', 'z', 'y', 'x'], u_4d),
+                                  'v': (['time', 'z', 'y', 'x'], v_4d),
+                                  'w': (['time', 'z', 'y', 'x'], w_4d)},
                                 coords={'time': t,
                                         'y': y,
                                         'z': z,
@@ -175,25 +182,28 @@ class Data:
         self.tfield.attrs['generator'] = 'PyConTurb'
 
 
-    def _cr8_plfield_ds(self, u, v, w):
-        x_coord= np.arange(self.ffield_bbox_cfg['x']['min'],
-                           self.ffield_bbox_cfg['x']['max'],
-                           self.ffield_bbox_cfg['x']['res'])
+    def _cr8_plfield_ds(self, bbox_id, u, v, w):
 
-        y_coord= np.arange(self.ffield_bbox_cfg['y']['min'],
-                           self.ffield_bbox_cfg['y']['max'],
-                           self.ffield_bbox_cfg['y']['res'])
+        x_coord= np.arange(self.bbox_ffield[bbox_id]['x']['min'],
+                            self.bbox_ffield[bbox_id]['x']['max'] +
+                            self.bbox_ffield[bbox_id]['x']['res'],
+                            self.bbox_ffield[bbox_id]['x']['res'])
 
-        z_coord= np.arange(self.ffield_bbox_cfg['z']['min'],
-                           self.ffield_bbox_cfg['z']['max'],
-                           self.ffield_bbox_cfg['z']['res'])
+        y_coord= np.arange(self.bbox_ffield[bbox_id]['y']['min'],
+                            self.bbox_ffield[bbox_id]['y']['max'] +
+                            self.bbox_ffield[bbox_id]['y']['res'],
+                            self.bbox_ffield[bbox_id]['y']['res'])
+
+        z_coord= np.arange(self.bbox_ffield[bbox_id]['z']['min'],
+                            self.bbox_ffield[bbox_id]['z']['max'] +
+                            self.bbox_ffield[bbox_id]['z']['res'],
+                            self.bbox_ffield[bbox_id]['z']['res'])
 
         base_array = np.empty((len(z_coord), len(y_coord),len(x_coord)))
 
         u = self._pl_fill_in(base_array, u)
         v = self._pl_fill_in(base_array, v)
         w = self._pl_fill_in(base_array, w)
-
 
         self.ffield = xr.Dataset({'u': (['z', 'y', 'x'], u),
                                   'v': (['z', 'y', 'x'], v),
@@ -211,19 +221,6 @@ class Data:
                                          'Flow field dataset')
         self.ffield.attrs['generator'] = 'power_law_model'
 
-    def _upd8_ffield_ds(self, u, v, w, no_dim = 3):
-
-        if no_dim == 3:
-            # create base array
-            base_array = np.empty((len(self.ffield.z),
-                                   len(self.ffield.y),
-                                   len(self.ffield.x)))
-
-
-            self.ffield.u.values = self._pl_fill_in(base_array, u)
-            self.ffield.v.values = self._pl_fill_in(base_array, v)
-            self.ffield.w.values = self._pl_fill_in(base_array, w)
-            self.ffield.attrs['generator'] = 'power_law_model'
 
     @staticmethod
     def _pl_fill_in(empty_array, values):
@@ -232,6 +229,26 @@ class Data:
         for i, value in enumerate(values):
             full_array[i, :, :] = value
         return full_array
+
+
+    def _upd8_meas_cfg(self, lidar_id, scan_type, az, el, rng, no_los,
+                      no_scans, scn_speed, sectrsz, scn_tm, rtn_tm, max_speed, max_acc):
+
+
+
+        self.meas_cfg[lidar_id]['config'].update({'scan_type':scan_type})
+        self.meas_cfg[lidar_id]['config'].update({'max_scn_speed':max_speed})
+        self.meas_cfg[lidar_id]['config'].update({'max_scn_acc':max_acc})
+        self.meas_cfg[lidar_id]['config'].update({'scn_speed':scn_speed})
+        self.meas_cfg[lidar_id]['config'].update({'no_los':no_los})
+        self.meas_cfg[lidar_id]['config'].update({'no_scans':no_scans})
+        self.meas_cfg[lidar_id]['config'].update({'sectrsz':sectrsz})
+        self.meas_cfg[lidar_id]['config'].update({'scn_tm':scn_tm})
+        self.meas_cfg[lidar_id]['config'].update({'rtn_tm':rtn_tm})
+        self.meas_cfg[lidar_id]['config'].update({'az':az})
+        self.meas_cfg[lidar_id]['config'].update({'el':el})
+        self.meas_cfg[lidar_id]['config'].update({'rng':rng})
+
 
 
     def _cr8_meas_cfg(self, lidar_pos, scan_type, az, el, rng, no_los,
@@ -251,27 +268,34 @@ class Data:
         self.meas_cfg.update({'el':el})
         self.meas_cfg.update({'rng':rng})
 
-    def _cr8_probing_ds(self, az, el, rng, time):
+    def _cr8_probing_ds(self, lidar_id, az, el, rng, time):
         # generating empty uncertainty and xyz arrays
         unc  = np.full(az.shape, 0.0, dtype=float)
         xyz  = np.full(az.shape, np.nan, dtype=float)
 
         # pulling information from measurement config dictionary
-        s_sz = self.meas_cfg['sectrsz'] if 'sectrsz' in self.meas_cfg else None
-        n_scn = self.meas_cfg['no_scans'] if 'no_scans' in self.meas_cfg else None
-        no_los = self.meas_cfg['no_los'] if 'no_los' in self.meas_cfg else None
-        s_tm = self.meas_cfg['scan_tm'] if 'scan_tm' in self.meas_cfg else None
-        r_tm = self.meas_cfg['return_tm'] if 'return_tm' in self.meas_cfg else None
-        lidar_pos = self.meas_cfg['lidar_pos'] if 'lidar_pos' in self.meas_cfg else None
+        s_sz = (self.meas_cfg[lidar_id]['config']['sectrsz']
+                if 'sectrsz' in self.meas_cfg[lidar_id]['config'] else None)
+        n_scn = (self.meas_cfg[lidar_id]['config']['no_scans']
+                if 'no_scans' in self.meas_cfg[lidar_id]['config'] else None)
+        no_los = (self.meas_cfg[lidar_id]['config']['no_los']
+                if 'no_los' in self.meas_cfg[lidar_id]['config'] else None)
+        s_tm = (self.meas_cfg[lidar_id]['config']['scn_tm']
+                if 'scn_tm' in self.meas_cfg[lidar_id]['config'] else None)
+        r_tm = (self.meas_cfg[lidar_id]['config']['rtn_tm']
+                if 'rtn_tm' in self.meas_cfg[lidar_id]['config'] else None)
+        lidar_pos = (self.meas_cfg[lidar_id]['position']
+                if 'position' in self.meas_cfg[lidar_id] else None)
 
-        self.probing = xr.Dataset({'az': (['time'], az),
+
+        probing_ds = xr.Dataset({'az': (['time'], az),
                                    'el': (['time'], el),
                                    'rng': (['time'], rng),
                                    'x': (['time'], xyz),
                                    'y': (['time'], xyz),
                                    'z': (['time'], xyz),
-                                   'unc_az': (['time'],  unc),
-                                   'unc_el': (['time'],  unc),
+                                   'unc_az': (['time'], unc),
+                                   'unc_el': (['time'], unc),
                                    'unc_rng': (['time'], unc),
                                    'unc_est': (['time'], unc),
                                    'sectrsz':(s_sz),
@@ -285,47 +309,65 @@ class Data:
                                    },coords={'time': time})
 
         # adding/updating metadata
-        self.probing = self._add_metadata(self.probing, metadata,
+        probing_ds = self._add_metadata(probing_ds, metadata,
                                      'Lidar atmosphere probing dataset')
 
-    def _add_unc(self, unc_term, samples):
-        self.probing[unc_term].values  = samples
+        self.probing.update({lidar_id:probing_ds})
 
-    def _add_xyz(self, x, y, z):
-        self.probing.x.values = x.values
-        self.probing.y.values = y.values
-        self.probing.z.values = z.values
 
-    def _cr8_los_ds(self, los):
+    def _add_unc(self, lidar_id, unc_term, samples):
+        self.tmp_unc = unc_term
+        self.tmp_unc_val = samples
+        self.probing[lidar_id][unc_term].values  = samples
+
+
+    def _add_xyz(self, lidar_id, x, y, z):
+        self.probing[lidar_id].x.values = x.values
+        self.probing[lidar_id].y.values = y.values
+        self.probing[lidar_id].z.values = z.values
+
+    def _cr8_los_ds(self, lidar_id, los):
         # TODO: detect what type of measurements it is (PPI, RHI, etc.)
         # TODO: we need somehow to
-        self.los = xr.Dataset({'vrad': (['time'], los),
-                              'az': (['time'], self.probing.az.values),
-                              'el': (['time'], self.probing.el.values),
-                              'rng': (['time'], self.probing.rng.values),
-                              'no_scans':(self.probing.no_scans.values),
-                              'no_los':  (self.probing.no_los.values)
-                              },coords={'time': self.probing.time.values})
+        los = xr.Dataset({'vrad': (['time'], los),
+                              'az': (['time'],  self.probing[lidar_id].az.values),
+                              'el': (['time'],  self.probing[lidar_id].el.values),
+                              'rng': (['time'], self.probing[lidar_id].rng.values),
+                              'no_scans':(self.probing[lidar_id].no_scans.values),
+                              'no_los':  (self.probing[lidar_id].no_los.values)
+                              },coords={'time': self.probing[lidar_id].time.values})
 
 
         # adding/updating metadata
-        self.los = self._add_metadata(self.los, metadata,
-                                      'Radial wind speed dataset')
+        los = self._add_metadata(los, metadata,'Radial wind speed dataset')
 
-    def _cr8_rc_wind_ds(self, u, v, ws):
-        self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
-                                   'u': (['scan'], u),
-                                   'v': (['scan'], v)
-                                   },coords={'scan': np.arange(1,len(u)+1, 1)})
+        self.los.update({lidar_id:los})
+
+    def _cr8_rc_wind_ds(self, scan_type, u, v, ws, wdir, w = None):
+
+        if type(w) != type(None):
+            self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
+                                    'wdir':(['scan'], wdir),
+                                    'u': (['scan'], u),
+                                    'v': (['scan'], v),
+                                    'w': (['scan'], w)
+                                    },coords={'scan': np.arange(1,len(u)+1, 1)})
+        else:
+            self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
+                                    'wdir':(['scan'], wdir),
+                                    'u': (['scan'], u),
+                                    'v': (['scan'], v)
+                                    },coords={'scan': np.arange(1,len(u)+1, 1)})
+
 
 
         # adding/updating metadata
         self.rc_wind = self._add_metadata(self.rc_wind, metadata,
                                       'Reconstructed wind')
-        self.rc_wind.attrs['scan_type'] = self.meas_cfg['scan_type']
+        self.rc_wind.attrs['scan_type'] = scan_type
 
-    def _get_ffield_coords(self):
-        bbox_cfg=self.ffield_bbox_cfg
+    def _get_ffield_coords(self, id):
+        bbox_cfg=self.bbox_ffield[id]
 
         x_coords = np.arange(bbox_cfg['x']['min'] -   bbox_cfg['x']['res'],
                              bbox_cfg['x']['max'] + 2*bbox_cfg['x']['res'],
@@ -356,5 +398,10 @@ class Data:
                 ds[coord].attrs = metadata.DIMS[coord]
         ds.attrs['title'] = ds_title
         return ds
+
+    @staticmethod
+    def _get_index(ds, id):
+        i, = np.where(ds.lidar_id == id)
+        return i
 
 data = Data()

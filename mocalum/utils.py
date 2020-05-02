@@ -2,7 +2,65 @@
 import numpy as np
 import xarray as xr
 from math import degrees, atan2
-from .persistance import data
+# from .persistance import data
+
+
+def generate_beam_coords(lidar_pos, meas_pt_pos):
+    """
+    Generates beam steering coordinates in spherical coordinate system.
+
+    Parameters
+    ----------
+    lidar_pos : ndarray
+        1D array containing data with `float` or `int` type corresponding to
+        Northing, Easting and Height coordinates of a lidar.
+        Coordinates unit is meter.
+    meas_pt_pos : ndarray
+        nD array containing data with `float` or `int` type corresponding to
+        Northing, Easting and Height coordinates of a measurement point(s).
+        Coordinates unit is meter.
+
+    Returns
+    -------
+    beam_coords : ndarray
+        nD array containing beam steering coordinates for given measurement points.
+        Coordinates have following structure [azimuth, elevation, range].
+        Azimuth and elevation angles are given in degree.
+        Range unit is meter.
+    """
+    # testing if  meas_pt has single or multiple measurement points
+    if len(meas_pt_pos.shape) == 2:
+        x_array = meas_pt_pos[:, 0]
+        y_array = meas_pt_pos[:, 1]
+        z_array = meas_pt_pos[:, 2]
+    else:
+        x_array = np.array([meas_pt_pos[0]])
+        y_array = np.array([meas_pt_pos[1]])
+        z_array = np.array([meas_pt_pos[2]])
+
+
+    # calculating difference between lidar_pos and meas_pt_pos coordiantes
+    dif_xyz = np.array([lidar_pos[0] - x_array, lidar_pos[1] - y_array, lidar_pos[2] - z_array])
+
+    # distance between lidar and measurement point in space
+    distance_3D = np.sum(dif_xyz**2,axis=0)**(1./2)
+
+    # distance between lidar and measurement point in a horizontal plane
+    distance_2D = np.sum(np.abs([dif_xyz[0],dif_xyz[1]])**2,axis=0)**(1./2)
+
+    # in radians
+    azimuth = np.arctan2(x_array-lidar_pos[0], y_array-lidar_pos[1])
+    # conversion to metrological convention
+    azimuth = (360 + azimuth * (180 / np.pi)) % 360
+
+    # in radians
+    elevation = np.arccos(distance_2D / distance_3D)
+    # conversion to metrological convention
+    elevation = np.sign(z_array - lidar_pos[2]) * (elevation * (180 / np.pi))
+
+    beam_coord = np.transpose(np.array([azimuth, elevation, distance_3D]))
+
+    return beam_coord
 
 def spher2cart(azimuth, elevation, radius):
     """Converts spherical coordinates to Cartesian coordinates
@@ -43,6 +101,117 @@ def spher2cart(azimuth, elevation, radius):
     except:
         raise TypeError('Dimensions of inputs are not the same!')
 
+
+def trajectory2displacement(lidar_pos, trajectory, rollover = True):
+    """
+    Converts trajectory described in a Cartesian coordinate system to
+    angular positions of the lidar scanner heads.
+
+    Parameters
+    ----------
+    lidar_pos : ndarray
+        nD array containing the lidar position in a Cartesian
+        coordinate system.
+    trajectory : ndarray
+        nD array containing trajectory points in a Cartesian
+        coordinateys system.
+    rollover : boolean
+        Indicates whether the lidar motion controller has
+        a rollover capability.
+        The default value is set to True.
+
+    Returns
+    -------
+    angles_start : ndarray
+        nD array containing the starting position of the scanner head.
+    angles_stop : ndarray
+        nD array containing the ending position of the scanner head.
+    angular_displacement : ndarray
+        nD array containing angular displacements that the motion system
+        needs to perform when moving from one to another trajectory point.
+    """
+
+    NO_DIGITS = 2
+    angles_start = generate_beam_coords(lidar_pos, np.roll(trajectory, 1, axis = 0))[:, (0,1)]
+    angles_stop = generate_beam_coords(lidar_pos, np.roll(trajectory, 0, axis = 0))[:, (0,1)]
+
+    angular_displacement = abs(angles_start - angles_stop)
+
+
+    ind_1 = np.where((angular_displacement[:, 0] > 180) &
+                     (abs(360 - angular_displacement[:, 0]) <= 180))
+
+    ind_2 = np.where((angular_displacement[:, 0] > 180) &
+                     (abs(360 - angular_displacement[:, 0]) > 180))
+
+    angular_displacement[:, 0][ind_1] = 360 - angular_displacement[:, 0][ind_1]
+    angular_displacement[:, 0][ind_2] = 360 + angular_displacement[:, 0][ind_2]
+
+
+    ind_1 = np.where((angular_displacement[:, 1] > 180) &
+                     (abs(360 - angular_displacement[:, 1]) <= 180))
+    ind_2 = np.where((angular_displacement[:, 1] > 180) &
+                     (abs(360 - angular_displacement[:, 1]) > 180))
+    angular_displacement[:, 1][ind_1] = 360 - angular_displacement[:, 1][ind_1]
+    angular_displacement[:, 1][ind_2] = 360 + angular_displacement[:, 1][ind_2]
+    return np.round(angles_start, NO_DIGITS), \
+           np.round(angles_stop, NO_DIGITS), \
+           np.abs(angular_displacement)
+
+
+
+def displacement2time(displacement, Amax, Vmax):
+    """
+    Calculates minimum move time to perform predefined angular motions.
+
+    Parameters
+    ----------
+    displacement : ndarray
+        nD array containing angular displacements
+        that a motion system needs to perform.
+        The displacements unit depends on the units of Amax and Vmax.
+        Typically the unit is in degrees.
+    Amax : float
+        Maximum permited acceleration of the motion system.
+        Typically the unit for Amax is degrees/s^2 .
+    Vmax : float
+        Maximum permited velocity of the motion system (aka rated speed).
+        Typically the unit for Vmas is degree/s .
+
+    Returns
+    -------
+    move_time : ndarray
+        nD array containing minimum move time to perform the diplacements
+        The unit of move_time elements depends on the input parameters.
+        Typically the unit is s (seconds).
+
+    Notes
+    -----
+    Equations used to calculate move time are based on [1],
+    assuming an infinite jerk.
+
+    References
+    ----------
+    .. [1] Peters R. D.: Ideal Lift Kinematics: Complete Equations for
+        Plotting Optimum Motion  Elevator Technology 6,
+        Proceedings of ELEVCON’95, 1995.
+    """
+
+    move_time = np.empty((len(displacement),), dtype=float)
+
+    # find indexes for which the scanner head
+    # will reach maximum velocity (i.e. rated speed)
+    index_a = np.where(displacement > (Vmax**2) / Amax)
+
+    # find indexes for which the scanner head
+    # will not reach maximum velocity (i.e. rated speed)
+    index_b = np.where(displacement <= (Vmax**2) / Amax)
+
+    move_time[index_a] = displacement[index_a] / Vmax + Vmax / Amax
+    move_time[index_b] = 2 * np.sqrt(displacement[index_b] / Amax)
+
+
+    return move_time
 
 
 def project2los(u,v,w, azimuth, elevation, ignore_elevation = True):
@@ -126,9 +295,11 @@ def ivap_rc(los, azimuth, ax = 0):
     u = (F*B - E*C) / D
     wind_speed = np.sqrt(u**2 + v**2)
 
-    return u, v, wind_speed
+    wind_dir = (90 - np.arctan2(-v,-u)* (180 / np.pi)) % 360
 
-def dd_rc(los, azimuth):
+    return u, v, wind_speed, wind_dir
+
+def dd_rc_single(los, azimuth):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -163,7 +334,7 @@ def dd_rc(los, azimuth):
 
 
 
-def td_rc(los, azimuth, elevation):
+def td_rc_single(los, azimuth, elevation):
     """Calculates u and v components by using IVAP algo on set of LOS speed
     measurements acquired using PPI scans.
 
@@ -196,6 +367,52 @@ def td_rc(los, azimuth, elevation):
     return u,v,w, wind_speed, wind_direction
 
 
+def dd_rc_array(los, azimuth, elevation, rc_type = 1):
+
+    azimuth = np.radians(azimuth)
+    elevation = np.radians(elevation)
+
+    if rc_type == 0:
+        R = np.array([[np.sin(azimuth[0]), np.sin(azimuth[1])],
+                      [np.cos(azimuth[0]), np.cos(azimuth[1])]])
+    else:
+        R = np.array([[np.sin(azimuth[0])*np.cos(elevation[0]),np.sin(azimuth[1])*np.cos(elevation[1])],
+                      [np.cos(azimuth[0])*np.cos(elevation[0]),np.cos(azimuth[1])*np.cos(elevation[1])]])
+
+    inv_R = np.linalg.inv(R.T)
+
+    uvw_array = np.einsum('ijk,ik->ij', inv_R,los.T)
+
+    V_h_array = np.sqrt(uvw_array[:,0]**2 + uvw_array[:,1]**2)
+
+    wind_dir_array = (90 - np.arctan2(-uvw_array[:,1],-uvw_array[:,0])* (180 / np.pi)) % 360
+    return uvw_array[:,0], uvw_array[:,1], V_h_array, wind_dir_array
+
+
+def td_rc_array(los, azimuth, elevation, rc_type = 1):
+
+    azimuth = np.radians(azimuth)
+    elevation = np.radians(elevation)
+
+    if rc_type == 0:
+        R = np.array([[np.sin(azimuth[0]), np.sin(azimuth[1]), np.sin(azimuth[2])],
+                      [np.cos(azimuth[0]), np.cos(azimuth[1]), np.cos(azimuth[2])],
+                      [np.sin(elevation[0]), np.sin(elevation[1]), np.sin(elevation[2])]])
+    else:
+        R = np.array([[np.sin(azimuth[0])*np.cos(elevation[0]),np.sin(azimuth[1])*np.cos(elevation[1]),np.sin(azimuth[2])*np.cos(elevation[2])],
+                      [np.cos(azimuth[0])*np.cos(elevation[0]),np.cos(azimuth[1])*np.cos(elevation[1]),np.cos(azimuth[2])*np.cos(elevation[2])],
+                      [np.sin(elevation[0]),                   np.sin(elevation[1]),                   np.sin(elevation[2])                   ]])
+
+    inv_R = np.linalg.inv(R.T)
+
+    uvw_array = np.einsum('ijk,ik->ij', inv_R,los.T)
+
+    V_h_array = np.sqrt(uvw_array[:,0]**2 + uvw_array[:,1]**2)
+
+    wind_dir_array = (90 - np.arctan2(-uvw_array[:,1],-uvw_array[:,0])* (180 / np.pi)) % 360
+    return uvw_array[:,0], uvw_array[:,1], uvw_array[:,2], V_h_array, wind_dir_array
+
+
 def move2time(displacement, Amax, Vmax):
     """
     Calculates minimum move time to perform predefined angular motions.
@@ -208,59 +425,6 @@ def move2time(displacement, Amax, Vmax):
     else:
         return 2*np.sqrt(displacement/Amax)
 
-# def get_ivap_probing(sector_size, azimuth_mid, angular_res,
-#                      elevation, distance, no_scans = 1,
-#                      scan_speed=1, max_speed=50, max_acc=100):
-
-#     az = np.arange(azimuth_mid-sector_size/2,
-#                    azimuth_mid+sector_size/2 + angular_res,
-#                    angular_res, dtype=float)
-
-#     no_los = len(az)
-
-#     az = np.tile(az, no_scans)
-#     dis = np.full(len(az), distance, dtype=float)
-#     el = np.full(len(az), elevation, dtype=float)
-#     xyz= np.full(len(az), np.nan, dtype=float)
-#     unc = np.full(len(az), 0, dtype=float)
-
-#     # setting up time dim
-#     time = np.arange(0, sector_size*scan_speed + angular_res*scan_speed,
-#                      angular_res*scan_speed)
-#     time = np.tile(time, no_scans)
-#     sweep_time = move2time(sector_size, max_acc, max_speed)
-#     scan_time = sector_size*scan_speed
-#     to_add = np.repeat(scan_time + sweep_time, no_scans*no_los)
-#     multip = np.repeat(np.arange(0,no_scans), no_los)
-#     time = time + multip*to_add
-
-#     data._cr8_los_ds(az, el, dis,)
-
-    # # needs to add scan_id as dimension
-    # ds = xr.Dataset({'az': (['time'], az),
-    #                  'el': (['time'], el),
-    #                  'dis': (['time'], dis),
-    #                  'x': (['time'], xyz),
-    #                  'y': (['time'], xyz),
-    #                  'z': (['time'], xyz),
-    #                  'unc_az': (['time'], unc),
-    #                  'unc_el': (['time'], unc),
-    #                  'unc_dis': (['time'], unc),
-    #                  'unc_los': (['time'], unc),
-    #                  'u': (['time'], unc),
-    #                  'v': (['time'], unc),
-    #                  'w': (['time'], unc),
-    #                  'v_rad': (['time'], unc),
-    #                  'sector_size':(sector_size),
-    #                  'no_scans':(no_scans),
-    #                  'no_los':(no_los),
-    #                  'scan_time':(scan_time),
-    #                  'sweep_back_time':(sweep_time),
-    #                  },
-
-    #                 coords={'time': time})
-
-    # return ds
 
 
 def add_xyz(ds, lidar_pos):
@@ -283,56 +447,6 @@ def get_plaw_uvw(height, ref_height=100, wind_speed=10,
     w_new = np.full(len(u_new), w)
 
     return u_new, v_new, w_new
-
-
-# def _fill_in(empty_array, values):
-#     full_array = np.copy(empty_array)
-#     for i, value in enumerate(values):
-#         full_array[i, :, :] = value
-#     return full_array
-
-
-# def gen_field_pl(ds, ref_height=100, wind_speed=10, w=0, wind_dir=180, shear_exponent=0.2):
-#     x_coords = np.arange(ds.x.min(), ds.x.max() + 1, 10)
-#     y_coords = np.arange(ds.y.min(), ds.y.max() + 1, 10)
-#     z_coords = np.arange(ds.z.min(), ds.z.max() + 1, 1)
-
-#     base_array = np.empty((len(z_coords), len(y_coords),len(x_coords)), dtype=float)
-#     u, v, w = get_uvw_pl(z_coords, ref_height, wind_speed, w, wind_dir, shear_exponent)
-
-#     u_array = _fill_in(base_array, u)
-#     v_array = _fill_in(base_array, v)
-#     w_array = _fill_in(base_array, w)
-
-#     ds_wind = xr.Dataset({'u': (['z', 'y', 'x'], u_array),
-#                           'v': (['z', 'y', 'x'], v_array),
-#                           'w': (['z', 'y', 'x'], w_array)},
-#                          coords={'x': x_coords, 'y': y_coords, 'z':z_coords})
-
-#     return ds_wind
-
-
-# def inject_wind_data(ds, ds_wind):
-
-#     ds.u.values = ds_wind.u.interp(x=ds.x.values.mean(),
-#                                    y=ds.y.values.mean(),
-#                                    z = ds.z.values)
-#     ds.v.values = ds_wind.v.interp(x=ds.x.values.mean(),
-#                                    y=ds.y.values.mean(),
-#                                    z = ds.z.values)
-#     ds.w.values = ds_wind.w.interp(x=ds.x.values.mean(),
-#                                    y=ds.y.values.mean(),
-#                                    z = ds.z.values)
-#     ds.v_rad.values = project2los(ds.u.values,
-#                                   ds.v.values,
-#                                   ds.w.values,
-#                                   ds.az.values + ds.unc_az.values,
-#                                   ds.el.values + ds.unc_el.values,
-#                                   ignore_elevation = True)
-
-#     ds.v_rad.values = ds.v_rad.values + ds.unc_los.values
-
-#     return ds
 
 
 def sliding_window_slicing(a, no_items, item_type=0):
@@ -426,3 +540,13 @@ def calc_mean_step(a):
     a.sort()
     steps = np.abs(np.roll(a,1) - a)[1:]
     return steps.mean()
+
+
+def safe_execute(default, exception, function, *args):
+    """
+    from: https://stackoverflow.com/questions/36671077/one-line-exception-handling
+    """
+    try:
+        return function(*args)
+    except exception:
+        return default
