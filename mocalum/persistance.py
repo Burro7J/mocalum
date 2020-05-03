@@ -1,5 +1,5 @@
-"""This module contains data class which stores data created in
-the interaction of users with mocalum.
+"""This module contains a class which stores data created in the interaction
+with mocalum.
 """
 import time
 from . import metadata
@@ -24,13 +24,57 @@ class Data:
 
 
     def _cr8_fmodel_cfg(self, cfg):
+        """
+        Adds configuration of flow model to class
+
+        Parameters
+        ----------
+        cfg : dict
+            Dictionary contating key-value paris which parametrize flow model
+        """
         self.fmodel_cfg = cfg
 
 
-    def _cr8_bbox_dict(self, type, key, CRS,
+    def _cr8_bbox_dict(self, bbox_type, key, CRS,
                        x_coord, y_coord, z_coord,t_coord,
                        x_offset, y_offset, z_offset,t_offset,
                        x_res, y_res, z_res, t_res, **kwargs):
+        """
+        Creates bounding box dictionary corresponding to measurement points
+
+        Parameters
+        ----------
+        bbox_type : str
+            Indicates type of bounding box, it can be 'lidar' or 'flow-field'
+        key : str
+            Key which will be used to add bounding box dict to dict of bboxes
+        CRS : dict
+            Dict describing coordinate reference system
+        x_coord : numpy
+            An array of x coordinates of measurement points
+        y_coord : numpy
+            An array of y coordinates of measurement points
+        z_coord : numpy
+            An array of z coordinates of measurement points
+        t_coord : numpy
+             An array of time instance at which measurement points are acquired
+        x_offset : float
+            Offset of x coordinates
+        y_offset : float
+            Offset of y coordinates
+        z_offset : float
+            Offset of z coordinates
+        t_offset : float
+            Time offset
+        x_res : int
+            Resolution of x coordinates
+        y_res : int
+            Resolution of y coordinates
+        z_res : int
+            Resolution of z coordinates
+        t_res : float
+            Resolution of time
+        """
 
         bbox_cfg = {}
 
@@ -61,7 +105,7 @@ class Data:
                               'offset':t_offset,
                               'res':t_res}})
 
-        if type == 'lidar':
+        if bbox_type == 'lidar':
             self.bbox_meas_pts.update({key:bbox_cfg})
         else:
             bbox_cfg.update({'linked_lidars':kwargs['linked_lidars']})
@@ -69,6 +113,16 @@ class Data:
 
 
     def _cr8_3d_tfield_ds(self, id, turb_df):
+        """
+        Creates Mocalum 3D flow field xr.DataSet
+
+        Parameters
+        ----------
+        id : str
+            ID of bounding box cfg
+        turb_df : pandas
+            PyConTurb pandas df containing 3D turbulence (y,z, time)
+        """
 
         _ , y, z, t = self._get_ffield_coords(id)
 
@@ -104,6 +158,14 @@ class Data:
         self.ffield.attrs['generator'] = 'PyConTurb'
 
     def _cr8_4d_tfield_ds(self, id):
+        """
+        Converts 3D turbulence flow field dataset to 4D dataset
+
+        Parameters
+        ----------
+        id : str
+            ID of bounding box cfg
+        """
 
         self._ffield = self.ffield
         R_tb = self.bbox_ffield[id]['CRS']['rot_matrix']
@@ -157,32 +219,21 @@ class Data:
         self.ffield = self._add_metadata(self.ffield, metadata,
                                          'Turbulent flow field dataset')
 
-
-
-
-    def _upd8_tfield_ds(self, turb_df):
-
-        _ , y, z, t = self._get_ffield_coords()
-
-        turb_np = turb_df.to_numpy().transpose().ravel()
-        turb_np = turb_np.reshape(int(len(turb_np)/len(t)), len(t))
-
-        u = turb_np[0::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-        v = turb_np[1::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-        w = turb_np[2::3].reshape(len(y), len(z) ,len(t)).transpose(1,0,2)
-
-
-        base_array = np.empty((len(self.tfield.z),
-                                len(self.tfield.y),
-                                len(self.tfield.t)))
-
-        self.tfield.u.values = self._pl_fill_in(base_array, u)
-        self.tfield.v.values = self._pl_fill_in(base_array, v)
-        self.tfield.w.values = self._pl_fill_in(base_array, w)
-        self.tfield.attrs['generator'] = 'PyConTurb'
-
-
     def _cr8_plfield_ds(self, bbox_id, u, v, w):
+        """
+        Creates power law flow field 3D dataset
+
+        Parameters
+        ----------
+        bbox_id : str
+            ID of bounding box cfg
+        u : numpy
+            ND array of shape (len(z), len(y), len(x)) of u values
+        v : numpy
+            ND array of shape (len(z), len(y), len(x)) of v values
+        w : numpy
+            ND array of shape (len(z), len(y), len(x)) of w values
+        """
 
         x_coord= np.arange(self.bbox_ffield[bbox_id]['x']['min'],
                             self.bbox_ffield[bbox_id]['x']['max'] +
@@ -224,6 +275,21 @@ class Data:
 
     @staticmethod
     def _pl_fill_in(empty_array, values):
+        """
+        Fills empty array with repeated values
+
+        Parameters
+        ----------
+        empty_array : numpy
+            Numpy array of shape ...
+        values : numpy
+            1D array of values to be filled in empty array
+
+        Returns
+        -------
+        numpy
+            Populated array with values
+        """
 
         full_array = np.copy(empty_array)
         for i, value in enumerate(values):
@@ -233,8 +299,38 @@ class Data:
 
     def _upd8_meas_cfg(self, lidar_id, scan_type, az, el, rng, no_los,
                       no_scans, scn_speed, sectrsz, scn_tm, rtn_tm, max_speed, max_acc):
+        """
+        Updates measurement config
 
-
+        Parameters
+        ----------
+        lidar_id : str
+            ID of lidar for which measurement config is updates
+        scan_type : str
+            Scan type
+        az : numpy
+            Array of all azimuth positions
+        el : numpy
+            Array of all elevation positions
+        rng : numpy
+            Array of all range values
+        no_los : int
+            Number of line of sight
+        no_scans : int
+            Number of scans
+        scn_speed : float
+            Averaged scan speed through all measurement points
+        sectrsz : float
+            Size of scanned area (sector size for PPI)
+        scn_tm : float
+            Total time for scanning through all measurement points
+        rtn_tm : float
+            Time to return from the end to the begining of the scan
+        max_speed : float
+            Maximum permitted angular speed, in deg/s
+        max_acc : float
+            Maximum permitted angular acceleration, in deg/s^2
+        """
 
         self.meas_cfg[lidar_id]['config'].update({'scan_type':scan_type})
         self.meas_cfg[lidar_id]['config'].update({'max_scn_speed':max_speed})
@@ -249,26 +345,23 @@ class Data:
         self.meas_cfg[lidar_id]['config'].update({'el':el})
         self.meas_cfg[lidar_id]['config'].update({'rng':rng})
 
-
-
-    def _cr8_meas_cfg(self, lidar_pos, scan_type, az, el, rng, no_los,
-                      no_scans, scn_speed, sectrsz, rtn_tm, max_speed, max_acc):
-
-        self.meas_cfg.update({'lidar_pos':lidar_pos})
-        self.meas_cfg.update({'scan_type':scan_type})
-        self.meas_cfg.update({'max_scn_speed':max_speed})
-        self.meas_cfg.update({'max_scn_acc':max_acc})
-        self.meas_cfg.update({'scn_speed':scn_speed})
-        self.meas_cfg.update({'no_los':no_los})
-        self.meas_cfg.update({'no_scans':no_scans})
-        self.meas_cfg.update({'sectrsz':sectrsz})
-        self.meas_cfg.update({'scn_tm':sectrsz*scn_speed})
-        self.meas_cfg.update({'rtn_tm':rtn_tm})
-        self.meas_cfg.update({'az':az})
-        self.meas_cfg.update({'el':el})
-        self.meas_cfg.update({'rng':rng})
-
     def _cr8_probing_ds(self, lidar_id, az, el, rng, time):
+        """
+        Creates Mocalum probing xr.DataSet
+
+        Parameters
+        ----------
+        lidar_id : str
+            ID of lidar for which probing dataset is created
+        az : numpy
+            Array of azimuth positions
+        el : numpy
+            Array of elevation positions
+        rng : numpy
+            Array of range values
+        time : numpy
+            Array of time values
+        """
         # generating empty uncertainty and xyz arrays
         unc  = np.full(az.shape, 0.0, dtype=float)
         xyz  = np.full(az.shape, np.nan, dtype=float)
@@ -316,19 +409,55 @@ class Data:
 
 
     def _add_unc(self, lidar_id, unc_term, samples):
+        """
+        Adds generated uncertainties to probing xr.DataSet
+
+        Parameters
+        ----------
+        lidar_id : str
+            Id of lidar from self.meas_cfg lidar dict
+        unc_term : str
+            ID of uncertainty term
+        samples : numpy
+            Numpy array containing generated values for given uncertainty term
+        """
         self.tmp_unc = unc_term
         self.tmp_unc_val = samples
         self.probing[lidar_id][unc_term].values  = samples
 
 
     def _add_xyz(self, lidar_id, x, y, z):
+        """
+        Adds Cartesian coordinates to probing dataset
+
+        Parameters
+        ----------
+        lidar_id : str
+            Id of lidar for which probing dataset is being updated
+        x : numpy
+            Array of x values
+        y : numpy
+            Array of y values
+        z : numpy
+            Array of z values
+        """
         self.probing[lidar_id].x.values = x.values
         self.probing[lidar_id].y.values = y.values
         self.probing[lidar_id].z.values = z.values
 
     def _cr8_los_ds(self, lidar_id, los):
+        """
+        Create mocalum los xarray dataset
+
+        Parameters
+        ----------
+        lidar_id : str
+            Id of lidar for which LOS dataset is being created
+        los : numpy
+            Array of los speed
+        """
         # TODO: detect what type of measurements it is (PPI, RHI, etc.)
-        # TODO: we need somehow to
+
         los = xr.Dataset({'vrad': (['time'], los),
                               'az': (['time'],  self.probing[lidar_id].az.values),
                               'el': (['time'],  self.probing[lidar_id].el.values),
@@ -344,7 +473,24 @@ class Data:
         self.los.update({lidar_id:los})
 
     def _cr8_rc_wind_ds(self, scan_type, u, v, ws, wdir, w = None):
+        """
+        Create mocalum reconstructed wind xarray dataset
 
+        Parameters
+        ----------
+        scan_type : str
+            Indicates scan type used to produce background LOS measurements
+        u : numpy
+            Array of reconstructed u values
+        v : numpy
+            Array of reconstructed v values
+        ws : numpy
+            Array of reconstructed wind speed values
+        wdir : numpy
+            Array of reconstructed wind direction values
+        w : numpy, optional
+            Array of reconstructed vertical wind speed, by default None
+        """
         if type(w) != type(None):
             self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
                                     'wdir':(['scan'], wdir),
@@ -367,6 +513,19 @@ class Data:
         self.rc_wind.attrs['scan_type'] = scan_type
 
     def _get_ffield_coords(self, id):
+        """
+        Gets coordinates of flow field points
+
+        Parameters
+        ----------
+        id : str
+            BBOX cfg id
+
+        Returns
+        -------
+        list
+            list of numpy arrays for x, y, z, and time coordinates
+        """
         bbox_cfg=self.bbox_ffield[id]
 
         x_coords = np.arange(bbox_cfg['x']['min'] -   bbox_cfg['x']['res'],
@@ -390,6 +549,23 @@ class Data:
 
     @staticmethod
     def _add_metadata(ds, metadata, ds_title=''):
+        """
+        Adds metadata to xr.DataSet
+
+        Parameters
+        ----------
+        ds : xr.DataSet
+            Mocalum xarray DataSet
+        metadata : module
+            Python module containing dictionaries of metadata
+        ds_title : str, optional
+            Title of DataSet, by default ''
+
+        Returns
+        -------
+        xr.DataSet
+            Mocalum xarray DataSet enriched with metadata
+        """
         for var in ds.data_vars.keys():
             if var in metadata.VARS:
                 ds[var].attrs = metadata.VARS[var]
@@ -399,9 +575,5 @@ class Data:
         ds.attrs['title'] = ds_title
         return ds
 
-    @staticmethod
-    def _get_index(ds, id):
-        i, = np.where(ds.lidar_id == id)
-        return i
 
 data = Data()

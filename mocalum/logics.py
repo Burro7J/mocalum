@@ -1,13 +1,20 @@
+"""This module contains a class which encapsulates methods that create or
+operate on data which are stored in persistance module.
+"""
+
 import numpy as np
 from numpy.linalg import inv as inv
 import xarray as xr
+
+# import data instance
 from .persistance import data
+
+# import utils functions
 from .utils import move2time, spher2cart, get_plaw_uvw, project2los, _rot_matrix
 from .utils import sliding_window_slicing, bbox_pts_from_array, bbox_pts_from_cfg
-from .utils import calc_mean_step, safe_execute, generate_beam_coords, trajectory2displacement, displacement2time
-from .utils import ivap_rc, dd_rc_array, td_rc_array
-from .samples import gen_unc
-from tqdm import tqdm
+from .utils import calc_mean_step, safe_execute, generate_beam_coords
+from .utils import trajectory2displacement, displacement2time
+from .utils import ivap_rc, dd_rc_array, td_rc_array, gen_unc
 
 # turbulence box generation tools
 from pyconturb.wind_profiles import power_profile
@@ -1119,7 +1126,7 @@ class Mocalum:
 
         # here we should introduce averaging according to no of scans
 
-        u, v, w, ws, wdir = td_rc_array(los, az, el, 1)
+        u, v, w, ws, wdir = td_rc_array(los, az, el)
 
         self.data._cr8_rc_wind_ds('triple-Doppler CT', u,v,ws,wdir, w)
 

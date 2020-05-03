@@ -1,9 +1,10 @@
+"""Various reusable functions ranging from lidar specific to those which are
+more generic.
+"""
 
 import numpy as np
 import xarray as xr
 from math import degrees, atan2
-# from .persistance import data
-
 
 def generate_beam_coords(lidar_pos, meas_pt_pos):
     """
@@ -25,8 +26,7 @@ def generate_beam_coords(lidar_pos, meas_pt_pos):
     beam_coords : ndarray
         nD array containing beam steering coordinates for given measurement points.
         Coordinates have following structure [azimuth, elevation, range].
-        Azimuth and elevation angles are given in degree.
-        Range unit is meter.
+        Azimuth and elevation angles are given in degree, range in meters.
     """
     # testing if  meas_pt has single or multiple measurement points
     if len(meas_pt_pos.shape) == 2:
@@ -116,9 +116,8 @@ def trajectory2displacement(lidar_pos, trajectory, rollover = True):
         nD array containing trajectory points in a Cartesian
         coordinateys system.
     rollover : boolean
-        Indicates whether the lidar motion controller has
-        a rollover capability.
-        The default value is set to True.
+        Indicates whether the lidar motion controller has a rollover capability
+        The default value is set to True
 
     Returns
     -------
@@ -236,10 +235,6 @@ def project2los(u,v,w, azimuth, elevation, ignore_elevation = True):
     -------
     los : numpy
         Projected wind vector to LOS, i.e. radial/los wind speed
-    Raises
-    ------
-    TypeError
-        If dimensions of inputs are not the same
     """
 
     # handles both single values as well arrays
@@ -261,8 +256,9 @@ def project2los(u,v,w, azimuth, elevation, ignore_elevation = True):
 
 
 def ivap_rc(los, azimuth, ax = 0):
-    """Calculates u and v components by using IVAP algo on set of LOS speed
-    measurements acquired using PPI scans.
+    """Performs IVAP wind retrieval on a set of LOS speed measurements
+
+    LOS speed measurements must be acquired using low-elevation PPI scan
 
     Parameters
     ----------
@@ -300,24 +296,28 @@ def ivap_rc(los, azimuth, ax = 0):
     return u, v, wind_speed, wind_dir
 
 def dd_rc_single(los, azimuth):
-    """Calculates u and v components by using IVAP algo on set of LOS speed
-    measurements acquired using PPI scans.
+    """
+    Retrieves wind speed by applying dual-Doppler retrieval on LOS measurements
+
+    LOS measurements must be acquired using two independent measurement devices
 
     Parameters
     ----------
     los : numpy
-        Array containing LOS speed measurements
+        Array containing two independent LOS speed measurements
     azimuth : numpy
-        Array containing azimuth angles corresponding to LOS speed measurements
+        Array containing azimuth angles at which LOS measurements are acquired
 
     Returns
     -------
-    u : numpy
-        Array of reconstracted u component of the wind
-    v : numpy
-        Array of reconstracted v component of the wind
-    wind_speed: numpy
-        Array of reconstracted horizontal wind speed
+    u : float
+        Reconstracted u component of the wind
+    v : float
+        Reconstracted v component of the wind
+    wind_speed: float
+        Reconstracted horizontal wind speed
+    wind_direction : float
+        Reconstructed wind direction
     """
 
     azimuth = np.radians(azimuth)
@@ -335,24 +335,28 @@ def dd_rc_single(los, azimuth):
 
 
 def td_rc_single(los, azimuth, elevation):
-    """Calculates u and v components by using IVAP algo on set of LOS speed
-    measurements acquired using PPI scans.
+    """
+    Retrieves wind speed by applying triple-Doppler retrieval on LOS measurements
+
+    LOS measurements must be acquired using three independent measurement devices
 
     Parameters
     ----------
     los : numpy
-        Array containing LOS speed measurements
+        Array containing three independent LOS speed measurements
     azimuth : numpy
-        Array containing azimuth angles corresponding to LOS speed measurements
+        Array containing azimuth angles at which LOS measurements are acquired
 
     Returns
     -------
-    u : numpy
-        Array of reconstracted u component of the wind
-    v : numpy
-        Array of reconstracted v component of the wind
-    wind_speed: numpy
-        Array of reconstracted horizontal wind speed
+    u : float
+        Reconstracted u component of the wind
+    v : float
+        Reconstracted v component of the wind
+    wind_speed: float
+        Reconstracted horizontal wind speed
+    wind_direction : float
+        Reconstructed wind direction
     """
     azimuth = np.radians(azimuth)
     elevation = np.radians(elevation)
@@ -368,7 +372,37 @@ def td_rc_single(los, azimuth, elevation):
 
 
 def dd_rc_array(los, azimuth, elevation, rc_type = 1):
+    """
+    Retrieves wind speed by applying dual-Doppler retrieval on LOS measurements
 
+    LOS measurements must be acquired using two independent measurement devices
+
+    Parameters
+    ----------
+    los : numpy
+        Array containing arrays of two independent LOS speed measurements
+        Shape of array must be (2, n), where n is number of LOS measurements
+    azimuth : numpy
+        Array containing azimuth angles at which LOS measurements are acquired
+        Shape of array must be (2, n), where n is number of azimuth positions
+    azimuth : numpy
+        Array containing elevation angles at which LOS measurements are acquired
+        Shape of array must be (2, n), where n is number of elevation positions
+    rc_type : int, optional
+        Flag which indicates whether to reconstruct wind considering (1) or
+        not (0) elevation angles of beams
+
+    Returns
+    -------
+    u : numpy
+        Reconstracted u component of the wind
+    v : numpy
+        Reconstracted v component of the wind
+    wind_speed: float
+        Reconstracted horizontal wind speed
+    wind_direction : float
+        Reconstructed wind direction
+    """
     azimuth = np.radians(azimuth)
     elevation = np.radians(elevation)
 
@@ -389,19 +423,43 @@ def dd_rc_array(los, azimuth, elevation, rc_type = 1):
     return uvw_array[:,0], uvw_array[:,1], V_h_array, wind_dir_array
 
 
-def td_rc_array(los, azimuth, elevation, rc_type = 1):
+def td_rc_array(los, azimuth, elevation):
+    """
+    Retrieves wind speed by applying triple-Doppler retrieval on LOS measurements
 
+    LOS measurements must be acquired using three independent measurement devices
+
+    Parameters
+    ----------
+    los : numpy
+        Array containing arrays of three independent LOS speed measurements
+        Shape of array must be (3, n), where n is number of LOS measurements
+    azimuth : numpy
+        Array containing azimuth angles at which LOS measurements are acquired
+        Shape of array must be (3, n), where n is number of azimuth positions
+    azimuth : numpy
+        Array containing elevation angles at which LOS measurements are acquired
+        Shape of array must be (3, n), where n is number of elevation positions
+
+    Returns
+    -------
+    u : numpy
+        Reconstracted u component of the wind
+    v : numpy
+        Reconstracted v component of the wind
+    w : numpy
+        Reconstracted w component of the wind
+    wind_speed: float
+        Reconstracted horizontal wind speed
+    wind_direction : float
+        Reconstructed wind direction
+    """
     azimuth = np.radians(azimuth)
     elevation = np.radians(elevation)
 
-    if rc_type == 0:
-        R = np.array([[np.sin(azimuth[0]), np.sin(azimuth[1]), np.sin(azimuth[2])],
-                      [np.cos(azimuth[0]), np.cos(azimuth[1]), np.cos(azimuth[2])],
-                      [np.sin(elevation[0]), np.sin(elevation[1]), np.sin(elevation[2])]])
-    else:
-        R = np.array([[np.sin(azimuth[0])*np.cos(elevation[0]),np.sin(azimuth[1])*np.cos(elevation[1]),np.sin(azimuth[2])*np.cos(elevation[2])],
-                      [np.cos(azimuth[0])*np.cos(elevation[0]),np.cos(azimuth[1])*np.cos(elevation[1]),np.cos(azimuth[2])*np.cos(elevation[2])],
-                      [np.sin(elevation[0]),                   np.sin(elevation[1]),                   np.sin(elevation[2])                   ]])
+    R = np.array([[np.sin(azimuth[0])*np.cos(elevation[0]),np.sin(azimuth[1])*np.cos(elevation[1]),np.sin(azimuth[2])*np.cos(elevation[2])],
+                    [np.cos(azimuth[0])*np.cos(elevation[0]),np.cos(azimuth[1])*np.cos(elevation[1]),np.cos(azimuth[2])*np.cos(elevation[2])],
+                    [np.sin(elevation[0]),                   np.sin(elevation[1]),                   np.sin(elevation[2])                   ]])
 
     inv_R = np.linalg.inv(R.T)
 
@@ -416,6 +474,20 @@ def td_rc_array(los, azimuth, elevation, rc_type = 1):
 def move2time(displacement, Amax, Vmax):
     """
     Calculates minimum move time to perform predefined angular motions.
+
+    Parameters
+    ----------
+    displacement : float
+        Angular displacement for which motion time is calculated
+    Amax : float
+        Maximum permitted angular acceleration, in deg/s^2
+    Vmax : float
+        Maximum permitted angular speed, in deg/s
+
+    Returns
+    -------
+    float
+        Motion time in seconds
     """
 
     max_acc_move = (Vmax**2) / Amax
@@ -427,18 +499,33 @@ def move2time(displacement, Amax, Vmax):
 
 
 
-def add_xyz(ds, lidar_pos):
-    x,y,z = spher2cart(ds.az +ds.unc_az,
-                       ds.el +ds.unc_el,
-                       ds.dis+ds.unc_dis)
-    ds.x.values = x.values + lidar_pos[0]
-    ds.y.values = y.values + lidar_pos[1]
-    ds.z.values = z.values + lidar_pos[2]
-
-    return ds
 
 def get_plaw_uvw(height, ref_height=100, wind_speed=10,
                  w=0, wind_dir=180, shear_exponent=0.2):
+    """
+    Generate values for u, v, and w wind vector components considering power law
+
+    Parameters
+    ----------
+    height : numpy
+        1D array containing heights at which wind vector should be calculated
+        Values are given in meter
+    ref_height : int, optional
+        Height at which wind speed is known, by default 100 m
+    wind_speed : int, optional
+        Wind speed at ref_height, by default 10 m/s
+    w : int, optional
+        Vertical wind speed, by default 0 m/s
+    wind_dir : int, optional
+        Wind direction, by default 180 deg
+    shear_exponent : float, optional
+        Shear exponent of wind, by default 0.2
+
+    Returns
+    -------
+    List of arrays
+        Three arrays containing values of u, v, and w wind vector components
+    """
     u = - wind_speed * np.sin(np.radians(wind_dir))
     v = - wind_speed * np.cos(np.radians(wind_dir))
     gain = (height / ref_height)**shear_exponent
@@ -450,12 +537,12 @@ def get_plaw_uvw(height, ref_height=100, wind_speed=10,
 
 
 def sliding_window_slicing(a, no_items, item_type=0):
-    """This method perfoms sliding window slicing of numpy arrays
+    """This method performs sliding window slicing of numpy arrays
 
     Parameters
     ----------
     a : numpy
-        An array to be slided in subarrays
+        An array to be sliced in subarrays
     no_items : int
         Number of sliced arrays or elements in sliced arrays
     item_type: int
@@ -486,6 +573,19 @@ def sliding_window_slicing(a, no_items, item_type=0):
 
 
 def _rot_matrix(wind_dir):
+    """
+    Calculates 2D rotational matrix for turbulence box generation
+
+    Parameters
+    ----------
+    wind_dir : float
+        Mean wind direction
+
+    Returns
+    -------
+    numpy
+        Rotational matrix expressed as numpy array of shape (2,2)
+    """
 
     azimuth = wind_dir - 90  # it is revers to permutate origina x&y axis
     azimuth = np.radians(azimuth) # converts to radians
@@ -495,6 +595,19 @@ def _rot_matrix(wind_dir):
 
 
 def bbox_pts_from_array(a):
+    """
+    Creates 2D bounding box points around points provided as numpy array
+
+    Parameters
+    ----------
+    a : numpy
+        Numpy array of shape (2,n) or (3,n) containing coordinate of points
+
+    Returns
+    -------
+    numpy
+        Numpy array of shape (2,2) corresponding to 4 corners of 2D bounding box
+    """
 
     bbox_pts = np.full((4,2), np.nan)
 
@@ -510,6 +623,19 @@ def bbox_pts_from_array(a):
     return bbox_pts
 
 def bbox_pts_from_cfg(cfg):
+    """
+    Creates 2D bounding box points from bounding box config dictionary
+
+    Parameters
+    ----------
+    cfg : dict
+        Bounding box dictionary
+
+    Returns
+    -------
+    numpy
+        Numpy array of shape (2,2) corresponding to 4 corners of 2D bounding box
+    """
 
     bbox_pts = np.full((4,2), np.nan)
     bbox_pts[0] = np.array([cfg['x']['min'],
@@ -550,3 +676,39 @@ def safe_execute(default, exception, function, *args):
         return function(*args)
     except exception:
         return default
+
+
+
+def gen_unc(mu, std, corr_coef=0, no_samples = 10000):
+    """Generate correlated random samples for inputs.
+
+    Parameters
+    ----------
+    mu : numpy
+        Array of mean values of inputs
+    std : numpy
+        Array of standard deviations if inputs
+    corr_coef : float
+        Correlation coffecient of inputs
+        Default 0, uncorrelated inputs
+        Max 1, 100% correlated inputs
+    no_samples : int, optional
+        Number of generated samamples, by default 10000
+
+    Returns
+    -------
+    samples : numpy
+        Array of correlated random samples.
+        Array dimension is (len(mu), no_samples)
+    """
+
+    if len(mu)!= len(std):
+        raise ValueError('Length of mu and std arrays are not the same!')
+
+    cov_matrix = np.full((len(mu), len(mu)), corr_coef)
+    np.fill_diagonal(cov_matrix, 1)
+
+    # Generate the random samples.
+    samples = std*np.random.multivariate_normal(mu, cov_matrix, no_samples)
+
+    return samples

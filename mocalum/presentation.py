@@ -5,7 +5,7 @@ import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 
 from .utils import spher2cart, bbox_pts_from_array, bbox_pts_from_cfg
-from .logics import _rot_matrix
+from .utils import _rot_matrix
 import numpy as np
 from numpy.linalg import inv as inv
 
