@@ -19,7 +19,7 @@
 <!-- - [TODO](../TODO.md) -->
 
 ## About <a name = "about"></a>
-
+`mocalum` is a python package for Monte Carlo based lidar uncertainty modeling.
 
 ## Getting Started <a name = "getting_started"></a>
 
