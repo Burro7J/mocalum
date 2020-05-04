@@ -45,5 +45,5 @@ This [tutorial](./tutorial-05) explains:
 - Calculation of wind speed uncertainty for sector scanning lidar considering correlated uncertainty terms
 - Calculation of wind speed uncertainty for sector scanning lidar considering uncorrelated uncertainty terms
 
-## **Tutorial 6: Comparison of Monte-Carlo simulation for single- and dual- Doppler configuration**
+## **Tutorial 6: Comparison of single- and dual- Doppler configurations**
 This [tutorial](./tutorial-06) joins [tutorial 4](./tutorial-04) and [tutorial 5](./tutorial-05), thus showing which lidar configuration is more accurate when comes to wind speed retrieval.
