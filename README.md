@@ -12,8 +12,8 @@
 - [Getting Started](#getting_started)
 - [Usage](#usage)
 - [Built Using](#built_using)
-- [Contributing](#contributing)
-- [Authors](#authors)
+- [Contributors](#authors)
+- [How to contribute](#contributing)
 - [How to cite](#cite)
 - [Acknowledgments](#acknowledgement)
 <!-- - [TODO](../TODO.md) -->
@@ -24,11 +24,8 @@
 ## Getting Started <a name = "getting_started"></a>
 
 ### Prerequisite <a name = "required"></a>
-Setup `conda` enviroment with all necessary dependencies needed to run `mocalum` (copy/paste in terminal and hit ENTER):
+You must have `conda` or `anaconda` installed on your computer.
 
-```
-conda create -c conda-forge -n mocalum --strict-channel-priority python=3.7 tqdm jupyter pytest netcdf4 xarray pylint matplotlib nbval scipy
-```
 
 ### Installing
 Make and activate a new `conda` environment:
@@ -47,14 +44,14 @@ pip install git+https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum.gi
 ```
 
 ## Running the test <a name = "tests"></a>
-While in `mocalum` folder go to `test` subfolder
+<!-- While in `mocalum` folder go to `test` subfolder
 ```
 cd test
 ```
 and execute script:
 ```
 python test_workflow.py
-```
+``` -->
 
 ## Usage <a name="usage"></a>
 
