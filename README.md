@@ -66,7 +66,7 @@ python test_workflow.py
 - [netCDF4]() - Package
 - [tqdm]() - Package
 - [scipy]() - Package
-- [pyconturb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb)
+- [pyconturb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb) - Package
 
 
 ## Contributors <a name = "authors"></a>
