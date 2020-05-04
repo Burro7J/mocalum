@@ -28,7 +28,7 @@ You must have `conda` or `anaconda` installed on your computer.
 
 
 ### Installing
-Make and activate a new `conda` environment:
+Make a new `conda` environment:
 ```
 conda create -n mc_test python=3.7
 ```
