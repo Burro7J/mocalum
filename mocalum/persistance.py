@@ -270,7 +270,7 @@ class Data:
         # Adding metadata
         self.ffield = self._add_metadata(self.ffield, metadata,
                                          'Flow field dataset')
-        self.ffield.attrs['generator'] = 'power_law_model'
+        self.ffield.attrs['generator'] = bbox_id
 
 
     @staticmethod

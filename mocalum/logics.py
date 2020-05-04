@@ -853,7 +853,7 @@ class Mocalum:
 
     # Methods related to projection of flow field to measurement points
     #
-    def project_to_los(self, lidar_id, ffield_id, ignore_elevation = True):
+    def project_to_los(self, lidar_id):
         """Projects wind vector on laser beam line-of-sight
 
 
@@ -861,10 +861,8 @@ class Mocalum:
         ----------
         lidar_id : str
             ID of lidar on which LOS wind vector is being projected
-        ffield_id : str
-            ID of wind field which will be used for wind vector projection
         """
-
+        ffield_id = self.data.ffield.generator
 
         if not(ffield_id in self.data.bbox_ffield):
             raise ValueError('Flow field does not exist')
