@@ -26,7 +26,7 @@
  - Configuration of `IVAP` (sector-scan) trajectory for single lidar
  - 3D or 4D / uniform or turbulent flow field generation
  - Sampling of correlated or uncorrelated uncertainty terms
- - Built-in 2nd order kinematic model for calculation trajectory timing
+ - Built-in 2nd order kinematic model for calculation of trajectory timing
  - 3D or 4D interpolation/projection of flow on lidar(s) line-of-sight(s)
  - [xarray](http://xarray.pydata.org/en/stable/#) datasets enriched with metadata
 
