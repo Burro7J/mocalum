@@ -31,24 +31,19 @@ conda create -c conda-forge -n mocalum --strict-channel-priority python=3.7 tqdm
 ```
 
 ### Installing
-Clone repository:
+Make and activate a new `conda` environment:
 ```
-git clone https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum.git
-```
-
-Afterwards, enter folder of `mocalum`
-```
-cd mocalum
+conda create -n mc_test python=3.7
 ```
 
 Be sure that you are in the previously made [conda environment](#required):
 ```
-conda activate mocalum
+conda activate mc_test
 ```
 
-Now install `mocalum` in the conda environment with the same name:
+Install `mocalum` in the new environment and you are ready to go:
 ```
-pip install .
+pip install git+https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum.git
 ```
 
 ## Running the test <a name = "tests"></a>
@@ -67,10 +62,22 @@ python test_workflow.py
 - [Python](https://www.python.org/) - Languange
 - [xarray](http://xarray.pydata.org/en/stable/#) - Package
 - [numpy](https://numpy.org/) - Package
+- [pandas]() - Package
+- [netCDF4]() - Package
+- [tqdm]() - Package
+- [scipy]() - Package
+- [pyconturb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb)
 
-## Authors <a name = "authors"></a>
-- [@niva]() - idea and work
-- [@smbd]() - idea and work
+
+## Contributors <a name = "authors"></a>
+
+### Author
+- [Nikola Vasiljevic](@niva) - design, development and testing (DevOps) of `mocalum`
+
+### Contributors
+- [Andrea Vignaroli](@andv) - initial wrapper around [PyConTurb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb), method for conversion of 3D to 4D turbulence box
+- [Bjarke Tobias Olsen](@btol) - hints on how to speed up advance interpolation using [xarray](http://xarray.pydata.org/en/stable/interpolation.html#advanced-interpolation)
+- [Anders Tegtmeier Pedersen](@antp) - `matlab` script to sample correlated uncertainties
 
 ## How to cite <a name = "cite"></a>
 
