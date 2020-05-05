@@ -353,8 +353,8 @@ class Mocalum:
 
         Parameters
         ----------
-        lidar_id : str
-            Id of lidar to be consider for genration of PPI measurement points
+        lidar_id : str, list or numpy
+            Id(s) of lidar to be consider for generation of complex trajectory
         CT_cfg : dict
             Dictionary holding configuration of complex trajectory
 
@@ -370,7 +370,7 @@ class Mocalum:
             - max_acc : int, optional
                  Max permitted angular acceleration, by default 100 (deg/s^2)
             - acq_time : int, optional
-                 Acquisition time to acquire LOS measurements, by default 1 (s)
+                 Acquisition time of LOS measurements, by default 1 (s)
             - sync : boolean, optional
                  Whether to synchronization or not trajectory among lidars,
                  by default True
@@ -963,6 +963,9 @@ class Mocalum:
         no_los = self.data.meas_cfg[lidar_id]['config']['no_los']
         no_scans = self.data.meas_cfg[lidar_id]['config']['no_scans']
 
+        if no_scans_avg != None and no_scans % no_scans_avg != 0:
+            raise ValueError('Total number of scans must be divisible with number of scans to average')
+
         if type(no_scans_avg) == int and (no_scans % no_scans_avg == 0):
             no_scans_new = int(no_scans/no_scans_avg)
             az= self._scan_average(self.data.los[lidar_id].az, no_los,
@@ -971,6 +974,7 @@ class Mocalum:
                                    no_scans, no_scans_avg).reshape(no_scans_new, no_los)
             los= self._scan_average(self.data.los[lidar_id].vrad, no_los,
                                    no_scans, no_scans_avg).reshape(no_scans_new, no_los)
+            no_scans = int(no_scans/no_scans_avg)
 
         else:
             az= self.data.los[lidar_id].az.values.reshape(no_scans, no_los)
@@ -980,7 +984,11 @@ class Mocalum:
 
         u, v, ws, wdir = ivap_rc(los, az, 1)
 
-        self.data._cr8_rc_wind_ds('single-Doppler IVAP', u,v,ws,wdir)
+        self.data._cr8_rc_wind_ds('single-Doppler IVAP',
+                                  u.reshape(no_scans, 1),
+                                  v.reshape(no_scans, 1),
+                                  ws.reshape(no_scans, 1),
+                                  wdir.reshape(no_scans, 1))
 
     def _is_dual_Doppler(self, lidar_id):
         """
@@ -1050,6 +1058,9 @@ class Mocalum:
         no_los = self.data.meas_cfg[lidar_id[0]]['config']['no_los']
         no_scans = self.data.meas_cfg[lidar_id[0]]['config']['no_scans']
 
+        if no_scans_avg != None and no_scans % no_scans_avg != 0:
+            raise ValueError('Total number of scans must be divisible with number of scans to average')
+
         if type(no_scans_avg) == int and (no_scans % no_scans_avg == 0):
             az = np.empty((2, int(no_los*no_scans/no_scans_avg)))
             el = np.empty((2, int(no_los*no_scans/no_scans_avg)))
@@ -1062,6 +1073,8 @@ class Mocalum:
                                            no_scans, no_scans_avg)
                 los[i] = self._scan_average(self.data.los[id].vrad, no_los,
                                            no_scans, no_scans_avg)
+
+            no_scans = int(no_scans/no_scans_avg)
 
         else:
             az = np.empty((2, no_los*no_scans))
@@ -1076,8 +1089,13 @@ class Mocalum:
 
 
         u, v, ws, wdir = dd_rc_array(los, az, el, 1)
+        self.ws = ws.reshape(no_scans, no_los)
 
-        self.data._cr8_rc_wind_ds('dual-Doppler CT', u,v,ws,wdir)
+        self.data._cr8_rc_wind_ds('dual-Doppler CT',
+                                  u.reshape(no_scans, no_los),
+                                  v.reshape(no_scans, no_los),
+                                  ws.reshape(no_scans, no_los),
+                                  wdir.reshape(no_scans, no_los))
 
 
 
@@ -1098,6 +1116,9 @@ class Mocalum:
         no_los = self.data.meas_cfg[lidar_id[0]]['config']['no_los']
         no_scans = self.data.meas_cfg[lidar_id[0]]['config']['no_scans']
 
+        if no_scans_avg != None and no_scans % no_scans_avg != 0:
+            raise ValueError('Total number of scans must be divisible with number of scans to average')
+
         if type(no_scans_avg) == int and (no_scans % no_scans_avg == 0):
             az = np.empty((3, int(no_los*no_scans/no_scans_avg)))
             el = np.empty((3, int(no_los*no_scans/no_scans_avg)))
@@ -1111,6 +1132,8 @@ class Mocalum:
                                            no_scans, no_scans_avg)
                 los[i] = self._scan_average(self.data.los[id].vrad, no_los,
                                            no_scans, no_scans_avg)
+
+            no_scans = int(no_scans/no_scans_avg)
 
         else:
             az = np.empty((3, no_los*no_scans))
@@ -1126,7 +1149,13 @@ class Mocalum:
 
         u, v, w, ws, wdir = td_rc_array(los, az, el)
 
-        self.data._cr8_rc_wind_ds('triple-Doppler CT', u,v,ws,wdir, w)
+        self.data._cr8_rc_wind_ds('triple-Doppler CT',
+                                  u.reshape(no_scans, no_los),
+                                  v.reshape(no_scans, no_los),
+                                  ws.reshape(no_scans, no_los),
+                                  wdir.reshape(no_scans, no_los),
+                                  w.reshape(no_scans, no_los))
+
 
     def reconstruct_wind(self, lidar_id, rc_method = 'IVAP', no_scans_avg=None):
         """Reconstructs wind speed according to the selected retrieval method

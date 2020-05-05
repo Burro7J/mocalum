@@ -215,7 +215,7 @@ class Data:
                                          'Height' : (['z'], z)
                                         })
 
-        self.ffield.attrs['generator'] = 'PyConTurb'
+        self.ffield.attrs['generator'] = 'turbulence_box'
         self.ffield = self._add_metadata(self.ffield, metadata,
                                          'Turbulent flow field dataset')
 
@@ -491,20 +491,22 @@ class Data:
         w : numpy, optional
             Array of reconstructed vertical wind speed, by default None
         """
+        shape = ws.shape
         if type(w) != type(None):
-            self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
-                                    'wdir':(['scan'], wdir),
-                                    'u': (['scan'], u),
-                                    'v': (['scan'], v),
-                                    'w': (['scan'], w)
-                                    },coords={'scan': np.arange(1,len(u)+1, 1)})
+            self.rc_wind = xr.Dataset({'ws': (['scan', 'point'], ws),
+                                    'wdir':(['scan', 'point'], wdir),
+                                    'u': (['scan', 'point'], u),
+                                    'v': (['scan', 'point'], v),
+                                    'w': (['scan', 'point'], w)
+                                    },coords={'scan': np.arange(1,shape[0]+1, 1),
+                                              'point' : np.arange(1,shape[1]+1, 1)})
         else:
-            self.rc_wind = xr.Dataset({'ws': (['scan'], ws),
-                                    'wdir':(['scan'], wdir),
-                                    'u': (['scan'], u),
-                                    'v': (['scan'], v)
-                                    },coords={'scan': np.arange(1,len(u)+1, 1)})
-
+            self.rc_wind = xr.Dataset({'ws': (['scan','point'], ws),
+                                    'wdir':(['scan', 'point'], wdir),
+                                    'u': (['scan', 'point'], u),
+                                    'v': (['scan', 'point'], v)
+                                    },coords={'scan': np.arange(1,shape[0]+1, 1),
+                                              'point' : np.arange(1,shape[1]+1, 1)})
 
 
         # adding/updating metadata

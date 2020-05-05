@@ -3,10 +3,12 @@ import matplotlib.pyplot as plt
 
 def plot_scan_setup(lidar_id, mc_obj):
     """
-    Plots 2D geometry of lidar scan and flow field box
+    Plots 2D geometry of single lidar scan
 
     Parameters
     ----------
+    lidar_id : str
+        Id of lidar
     mc_obj : mocalum
         Instance of mocalum class
     """
