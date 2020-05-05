@@ -471,6 +471,44 @@ class Data:
         los = self._add_metadata(los, metadata,'Radial wind speed dataset')
 
         self.los.update({lidar_id:los})
+    def _cr8_sonic_ds(self, points_pos, time, u, v, w, ws, wdir):
+        """
+        Create mocalum virtual sonic anemometer xarray dataset
+
+        Parameters
+        ----------
+        points_pos : numpy
+            Measurement point position as (n,3) shaped numpy array
+        time : numpy
+            Numpy array of time instances at which sonic is 'measuring'
+        u : numpy
+            Array of reconstructed u values
+        v : numpy
+            Array of reconstructed v values
+        ws : numpy
+            Array of reconstructed wind speed values
+        wdir : numpy
+            Array of reconstructed wind direction values
+        w : numpy, optional
+            Array of reconstructed vertical wind speed, by default None
+        """
+        shape = points_pos.shape
+
+        self.sonic_wind = xr.Dataset({'ws': (['time', 'point'], ws),
+                                'wdir':(['time','point'], wdir),
+                                'u': (['time', 'point'], u),
+                                'v': ([ 'time', 'point'], v),
+                                'w': (['time', 'point'], w)
+                                },coords={'time': time,
+                                          'point' : np.arange(1,len(points_pos)+1, 1),
+                                          'x':(['point'], points_pos[:,0]),
+                                          'y':(['point'], points_pos[:,1]),
+                                          'z':(['point'], points_pos[:,2])})
+
+        # adding/updating metadata
+        self.sonic_wind = self._add_metadata(self.sonic_wind, metadata,
+                                             'Virtual sonics')
+
 
     def _cr8_rc_wind_ds(self, scan_type, u, v, ws, wdir, w = None):
         """

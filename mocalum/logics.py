@@ -944,7 +944,6 @@ class Mocalum:
 
         return a_avg.flatten()
 
-
     def _IVAP_reconstruction(self, lidar_id, no_scans_avg):
         """
         IVAP wind reconstruction method
@@ -1097,6 +1096,67 @@ class Mocalum:
                                   ws.reshape(no_scans, no_los),
                                   wdir.reshape(no_scans, no_los))
 
+
+
+
+    def generate_virtual_sonic(self, meas_pts, time_steps):
+        """
+        Creates virtual sonic measurements at predefined locations and time steps
+
+        Parameters
+        ----------
+        meas_pts : numpy
+            Measurement point position as (n,3) shaped numpy array
+        time_steps : numpy
+            Numpy array of time instances at which sonic is 'measuring'
+        """
+
+        if self.data.fmodel_cfg['flow_model'] == 'power_law':
+            hmeas = meas_pts[:,2]
+            u = self.data.ffield.u.isel(x=0,y=0).interp(z=hmeas).values
+            v = self.data.ffield.v.isel(x=0,y=0).interp(z=hmeas).values
+            w = self.data.ffield.w.isel(x=0,y=0).interp(z=hmeas).values
+
+        elif self.data.fmodel_cfg['flow_model'] == 'PyConTurb':
+
+            # Normalize time to re-feed the turbulence
+            time_tbox = self.data.ffield.time.values
+            time_norm = np.mod(time_steps, time_tbox.max())
+
+            # Rotate absolute coordinates to relative coordinates
+            R_tb = self.data.bbox_ffield['turbulence_box']['CRS']['rot_matrix']
+            x_r = meas_pts[:,0]
+            y_r = meas_pts[:,1]
+            z_coords = meas_pts[:,2]
+            xy = np.array([x_r,y_r]).T.dot(R_tb)
+            x_coords = xy[:,0]
+            y_coords = xy[:,1]
+
+            # Preparing input for xarray interpolation
+            t = xr.DataArray(np.tile(time_norm, len(x_coords)), dims='pt')
+            x = xr.DataArray(np.repeat(x_coords, len(time_norm)), dims='pt')
+            y = xr.DataArray(np.repeat(y_coords, len(time_norm)), dims='pt')
+            z = xr.DataArray(np.repeat(z_coords, len(time_norm)), dims='pt')
+
+            # Interpolation of 4D dataset to coordinates of interest
+            ffield_pts = self.data.ffield.interp(time=t,
+                                                 x=x,
+                                                 y=y,
+                                                 z=z, method='linear')
+            # Extracts u, v and w from the derived xarray ds
+            u = ffield_pts.u.values
+            v = ffield_pts.v.values
+            w = ffield_pts.w.values
+
+        u = u.reshape(len(meas_pts), len(time_steps)).T
+        v = v.reshape(len(meas_pts), len(time_steps)).T
+        w = w.reshape(len(meas_pts), len(time_steps)).T
+
+
+        ws = np.sqrt(u**2 + v**2)
+        wdir = (90 - np.arctan2(-v,u)* (180 / np.pi)) % 360
+
+        self.data._cr8_sonic_ds(meas_pts, time_steps, u, v, w, ws, wdir)
 
 
     def _triple_Doppler_reconstruction(self, lidar_id, no_scans_avg):
