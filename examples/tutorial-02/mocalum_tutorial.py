@@ -155,7 +155,7 @@ def bbox_pts_from_cfg(cfg):
     return bbox_pts
 
 
-def plot_bbox(mc_obj, dir_arrow=500):
+def plot_bbox(mc_obj):
     """
     Plots 2D geometry of lidar scan and flow field box
 
@@ -175,6 +175,7 @@ def plot_bbox(mc_obj, dir_arrow=500):
     meas_pts= mc_obj._get_prob_cords(lidar_ids[0])[:no_los]
 
     bbox_pts = bbox_pts_from_cfg(mc_obj.data.bbox_ffield[flow_id])
+    diag = np.abs(bbox_pts[0]-bbox_pts[2]).max()
     R_tb = mc_obj.data.bbox_ffield[flow_id]['CRS']['rot_matrix']
     min_bbox_pts = bbox_pts.dot(inv(R_tb))
     bbox_c = min_bbox_pts.mean(axis = 0)
@@ -183,7 +184,7 @@ def plot_bbox(mc_obj, dir_arrow=500):
 
     flowbox = Polygon(min_bbox_pts,alpha=0.4, color='grey', label="flow field bbox")
 
-    wind_dir_pt = spher2cart(wind_dir,0,dir_arrow)[:2]
+    wind_dir_pt = spher2cart(wind_dir,0,diag/2)[:2]
 
     lidar_pos = []
     for id in lidar_ids:
@@ -217,7 +218,7 @@ def plot_bbox(mc_obj, dir_arrow=500):
     plt.show()
 
 
-def plot_ffield(mc_obj, dir_arrow=500):
+def plot_ffield(mc_obj):
     """
     Plots 2D geometry of lidar scan and flow field box
 
@@ -237,6 +238,7 @@ def plot_ffield(mc_obj, dir_arrow=500):
     meas_pts= mc_obj._get_prob_cords(lidar_ids[0])[:no_los]
 
     bbox_pts = bbox_pts_from_cfg(mc_obj.data.bbox_ffield[flow_id])
+    diag = np.abs(bbox_pts[0]-bbox_pts[2]).max()
     R_tb = mc_obj.data.bbox_ffield[flow_id]['CRS']['rot_matrix']
     min_bbox_pts = bbox_pts.dot(inv(R_tb))
     bbox_c = min_bbox_pts.mean(axis = 0)
@@ -245,7 +247,7 @@ def plot_ffield(mc_obj, dir_arrow=500):
 
     flowbox = Polygon(min_bbox_pts,alpha=0.4, color='grey', label="flow field bbox")
 
-    wind_dir_pt = spher2cart(wind_dir,0,dir_arrow)[:2]
+    wind_dir_pt = spher2cart(wind_dir,0,diag/2)[:2]
 
     lidar_pos = []
     for id in lidar_ids:

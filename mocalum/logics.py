@@ -211,16 +211,16 @@ class Mocalum:
                  Size of the scanned sector in degrees
             - azimuth_mid : float, int
                  Central azimuth angle of the PPI scanned arc
-            - angular_res : float, int
-                 Angular resolution of PPI scan
+            - angular_step : float, int
+                 Incremental step performed to complete a PPI scan
+            - acq_time : float
+                 Acquisition time per angular step
             - elevation : float, int
                  Elevation angle of PPI scan
             - range : float, int
                  Range at which measurements should take place
             - no_scans : int, optional
                  Number of PPI scans must be equal or bigger than 1
-            - scan_speed : int
-                 Angular speed in deg/s
             - max_speed : int
                  Max permitted angular speed
             - max_acc : int
@@ -228,33 +228,42 @@ class Mocalum:
 
         """
 
+        if 'max_acc' not in PPI_cfg or 'max_speed' not in PPI_cfg:
+            no_kinematics = True
+        else:
+            no_kinematics = False
 
         sector_size = PPI_cfg['sector_size']
         azimuth_mid = PPI_cfg['azimuth_mid']
-        angular_res = PPI_cfg['angular_res']
+        angular_step = PPI_cfg['angular_step']
         elevation = PPI_cfg['elevation']
         rng = PPI_cfg['range']
         no_scans  = PPI_cfg['no_scans']
-        scan_speed = PPI_cfg['scan_speed']
-        max_speed = PPI_cfg['max_speed']
-        max_acc = PPI_cfg['max_acc']
+        acq_time =  PPI_cfg['acq_time']
+        scan_speed = angular_step / acq_time
+
+        max_speed = PPI_cfg['max_speed']  if 'max_speed' in PPI_cfg else 50
+        max_acc = PPI_cfg['max_acc']  if 'max_acc' in PPI_cfg else 100
 
 
         # prevent users stupidity raise errors!
-        if angular_res <= 0:
-            raise ValueError('Angular resolution must be > 0!')
+        if angular_step <= 0:
+            raise ValueError('Angular step must be > 0!')
         if no_scans <= 0:
             raise ValueError('Number of scans must be > 0!')
         if type(no_scans) is not int:
             raise ValueError('Number of scans must be int!')
 
         az = np.arange(azimuth_mid-sector_size/2,
-                       azimuth_mid+sector_size/2 + angular_res,
-                       angular_res, dtype=float)
+                       azimuth_mid+sector_size/2,
+                       angular_step, dtype=float)
         rng = np.full(len(az), rng, dtype=float)
         el = np.full(len(az), elevation, dtype=float)
         no_los = len(az)
-        sweep_time = move2time(sector_size, max_acc, max_speed)
+        if no_kinematics:
+            sweep_time = 0
+        else:
+            sweep_time = move2time(sector_size, max_acc, max_speed)
         scan_time = sector_size*scan_speed
 
         # lidar_pos = self.data.meas_cfg[lidar_id]['position']
@@ -270,8 +279,11 @@ class Mocalum:
         el = np.tile(el, no_scans)
 
         # creating time dim
-        time = np.arange(0, sector_size*scan_speed + angular_res*scan_speed,
-                        angular_res*scan_speed)
+        time = np.arange(acq_time, (1 + sector_size/angular_step)*acq_time,
+                         acq_time)
+
+        # time = np.arange(0, sector_size*scan_speed + angular_step*scan_speed,
+        #                 angular_step*scan_speed)
         time = np.tile(time, no_scans)
         to_add = np.repeat(scan_time + sweep_time, no_scans*no_los)
         multip = np.repeat(np.arange(0,no_scans), no_los)
@@ -320,12 +332,17 @@ class Mocalum:
             Dictionary containing key-value pairs for azimuth, elevation,
             range, maximum angular displacement and trajectory timing
         """
+        if 'max_acc' not in CT_cfg or 'max_speed' not in CT_cfg:
+            no_kinematics = True
+        else:
+            no_kinematics = False
 
         meas_pts = CT_cfg['points']
-        no_scans = CT_cfg['no_scans']
-        max_speed = CT_cfg['max_speed']
-        max_acc = CT_cfg['max_acc']
-        acq_time = CT_cfg['acq_time']
+        no_los = len(meas_pts)
+        no_scans = CT_cfg['no_scans']  if 'no_scans' in CT_cfg else 1
+        max_speed = CT_cfg['max_speed']  if 'max_speed' in CT_cfg else 50
+        max_acc = CT_cfg['max_acc']  if 'max_acc' in CT_cfg else 100
+        acq_time = CT_cfg['acq_time']  if 'acq_time' in CT_cfg else 1
 
         lidar_pos = self.data.meas_cfg[lidar_id]['position']
         beam_coord = generate_beam_coords(lidar_pos, meas_pts)
@@ -336,8 +353,11 @@ class Mocalum:
 
         _ , _, displacement = trajectory2displacement(lidar_pos, meas_pts)
         max_displacement = np.max(displacement, axis = 1)
-
-        traj_timing = displacement2time(max_displacement, max_speed, max_acc)
+        if no_kinematics:
+            traj_timing = np.full(no_los, 0)
+        else:
+            traj_timing = displacement2time(max_displacement,
+                                            max_speed, max_acc)
 
         return {'az':az,
                 'el':el,
@@ -365,6 +385,8 @@ class Mocalum:
                  ND array of x, y and z triplets of measurement points
             - no_scans : int, optional
                  Number of PPI scans must be equal or bigger than 1
+
+        following keys are optional:
             - max_speed : int, optional
                  Max permitted angular speed, by default 50 (deg/s)
             - max_acc : int, optional
@@ -419,7 +441,7 @@ class Mocalum:
         for i in range(0,len(traj_timing)):
             traj_timing[i] = max_time if sync == True else traj_timing[i]
 
-            if len(max_displacement[i]) == 1:
+            if len(max_displacement[i]) == 1 or traj_timing[i][0]==0:
                 avg_scan_speed = 0
             else:
                 avg_scan_speed = np.mean(max_displacement[i]/traj_timing[i])
