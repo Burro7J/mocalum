@@ -109,3 +109,4 @@ data/.DS_Store
 .vscode/
 .DS_Store
 default.profraw
+/examples/monte_carlo.ipynb

@@ -1138,6 +1138,7 @@ class Mocalum:
             u = self.data.ffield.u.isel(x=0,y=0).interp(z=hmeas).values
             v = self.data.ffield.v.isel(x=0,y=0).interp(z=hmeas).values
             w = self.data.ffield.w.isel(x=0,y=0).interp(z=hmeas).values
+            return print('No need for virtual sonic, this is uniform flow field!')
 
         elif self.data.fmodel_cfg['flow_model'] == 'PyConTurb':
 
@@ -1176,7 +1177,7 @@ class Mocalum:
 
 
         ws = np.sqrt(u**2 + v**2)
-        wdir = (90 - np.arctan2(-v,u)* (180 / np.pi)) % 360
+        wdir = (90 - np.arctan2(-v,-u)* (180 / np.pi)) % 360
 
         self.data._cr8_sonic_ds(meas_pts, time_steps, u, v, w, ws, wdir)
 
