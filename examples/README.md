@@ -37,13 +37,13 @@ This [tutorial](./tutorial-04) explains:
  - Generation of 4D turbulent flow field
  - Calculation of wind speed uncertainty for sector scanning lidar considering correlated uncertainty terms
  - Calculation of wind speed uncertainty for sector scanning lidar considering uncorrelated uncertainty terms
- - Running simulation for full range of wind direction and angular sectors
+ - Running simulation for a range of wind direction and angular sectors
 
 ## **Tutorial 5: Monte-Carlo simulation for dual-Doppler configuration** <a name = "dual-Doppler"></a>
 This [tutorial](./tutorial-05) explains:
  - Configuration of dual-Doppler measurement scenario
  - Generation of 4D turbulent flow field
- - Running simulation for full range of wind direction and between-beam angles (i.e., intersecting angles between two laser beams)
+ - Running simulation for a range of wind direction and between-beam angles (i.e., intersecting angles between two laser beams)
 
-## **Tutorial 6: Comparison of single- and dual- Doppler configurations**
-This [tutorial](./tutorial-06) joins [tutorial 4](./tutorial-04) and [tutorial 5](./tutorial-05), thus showing which lidar configuration is more accurate when comes to wind speed retrieval.
+<!-- ## **Tutorial 6: Comparison of single- and dual- Doppler configurations**
+This [tutorial](./tutorial-06) joins [tutorial 4](./tutorial-04) and [tutorial 5](./tutorial-05), thus showing which lidar configuration is more accurate when comes to wind speed retrieval. -->
