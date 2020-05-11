@@ -1,15 +1,15 @@
 # Overview
 
 `mocalum` is a python package for Monte Carlo based lidar uncertainty modeling. It has following features:
- - Fast Monte Carlo uncertainty modeling
- - Simulation of single or multi lidar configuration
- - Configuration of arbitrary trajectories for single and multi lidars
- - Configuration of [IVAP](https://journals.ametsoc.org/doi/10.1175/JTECH2047.1) (sector-scan) trajectory for single lidar
- - 3D or 4D / uniform or turbulent flow field generation
- - Sampling of correlated or uncorrelated uncertainty terms
- - Built-in 2nd order kinematic model for calculation of trajectory timing
- - 3D or 4D interpolation/projection of flow on lidar(s) line-of-sight(s)
- - [xarray](http://xarray.pydata.org/en/stable/#) datasets enriched with metadata
+- Fast Monte Carlo uncertainty modeling
+- Simulation of single or multi lidar configuration
+- Configuration of arbitrary trajectories for single and multi lidars
+- Configuration of [IVAP](https://journals.ametsoc.org/doi/10.1175/JTECH2047.1) (sector-scan) trajectory for single lidar
+- 3D or 4D / uniform or turbulent flow field generation
+- Sampling of correlated or uncorrelated uncertainty terms
+- Built-in 2nd order kinematic model for calculation of trajectory timing
+- 3D or 4D interpolation/projection of flow on lidar(s) line-of-sight(s)
+- [xarray](http://xarray.pydata.org/en/stable/#) datasets enriched with metadata
 
 ## `mocalum` workflow
 
