@@ -13,23 +13,22 @@
 
 ## `mocalum` workflow
 
-
- Typical `mocalum` workflow includes following steps (depict in the figure below):
- 1. Creating `mocalum` object
- 1. Adding lidar(s) and configuring uncertainty contributors to the object
- 2. Setting up measurement scenario for previously added lidar(s)
- 2. Sampling uncertainties
- 3. Generating flow field entailing measurement points
- 4. Project flow field on line-of-sight(s)
- 5. Reconstruct wind vector(s)
- 6. Perform statistical analysis of reconstructed wind vectors
+Typical `mocalum` workflow includes following steps (depict in the figure below):
+1. Creating `mocalum` object
+1. Adding lidar(s) and configuring uncertainty contributors to the object
+2. Setting up measurement scenario for previously added lidar(s)
+2. Sampling uncertainties
+3. Generating flow field entailing measurement points
+4. Project flow field on line-of-sight(s)
+5. Reconstruct wind vector(s)
+6. Perform statistical analysis of reconstructed wind vectors
 
 ![mocalum workflow](./assets/workflow.png)
 
- **Figure 1.** `mocalum` workflow
+**Figure 1.** `mocalum` workflow
 
 ### `mocalum` object
- `mocalum` is developed considering [object-oriented paradigm](https://realpython.com/python3-object-oriented-programming/). Therefore, all calculations and access to generated data are through an instance of `mocalum` object on which various methods are applied. Once an instance of `mocalum` object is created users have access to following methods:
+`mocalum` is developed considering [object-oriented paradigm](https://realpython.com/python3-object-oriented-programming/). Therefore, all calculations and access to generated data are through an instance of `mocalum` object on which various methods are applied. Once an instance of `mocalum` object is created users have access to following methods:
 
 - `add_lidar`
 - `generate_complex_trajectory`
@@ -187,7 +186,7 @@ Visually our measurement scenario is shown in the figure below.
 
 ![mocalum workflow](./assets/koshava_PPI_scan.png)
 
- **Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
+**Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
 
 
 ### Sampling uncertainties
@@ -201,11 +200,10 @@ If we now visually represent the measurement scenario (see Figure 3) we can noti
 
 ![mocalum workflow](./assets/koshava_PPI_scan_crooked.png)
 
- **Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
+**Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
 
 
- ### Generating flow field
+### Generating flow field
 
- ### Wind reconstruction
-
- ### Uncertainty analysis
+### Wind reconstruction
+### Uncertainty analysis
