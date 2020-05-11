@@ -14,12 +14,12 @@ Lets consider a lidar which we will call `koshava`, located at position of (0,0,
 
 Figure 7 depicts histograms of sampled uncertainty contributors of a PPI scan of 30 degrees for all LOSs and for all 189000 scans. As expected the histograms exhibit normal distributions with mean in zero and standard deviations equal to the above listed values.
 
-![unc dist](./assets/dist_unc.png)
+![unc dist](./assets/dist_unc.png)<br>
 **Figure 7.** Distribution of sampled and injected uncertainties to probing dataset
 
 The atmosphere in which the virtual PPI scans will be performed will be turbulent. Nevertheless, the mean wind speed will be set to 10 m/s at the reference height of 100 m above the ground level, while the shear exponent has value of 0.2. We are considering two wind directions, 0 degrees (the wind coming from the North being perpendicular to the central azimuth angle of the PPI scans) and 90 degrees (the wind coming from the East being in-line with the central azimuth angle of the PPI scans). These two wind direction scenarios are depicted in Figure 8.
 
-![two wind scenarios](./assets/two_wind_dir.png)
+![two wind scenarios](./assets/two_wind_dir.png)<br>
 **Figure 8.** Two wind direction scenarios: (1) wind coming from North - blue arrow and (2) wind coming from East - red arrow
 
 This configuration is provided as an interactive jupyter-notebook denoted [tutorial 4](https://github.com/niva83/mocalum/tree/master/examples) in `mocalum` git repository.
