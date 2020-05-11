@@ -1,6 +1,6 @@
 # **mocalum examples**
 
-Here you will find examples on how to use [mocalum](https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum) provided as [jupyter](https://jupyter.org/) notebooks. The purpose of the examples are to familiarize users with [mocalum](https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum) and enable them to quickly build there own workflows with it. The examples cover various usage of [mocalum](https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum) and they are provided as 6 tutorials.
+Here you will find examples on how to use [mocalum](https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum) provided as [jupyter](https://jupyter.org/) notebooks. The purpose of the examples are to familiarize users with [mocalum](https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum) and enable them to quickly build there own workflows with it. The examples cover various usage of [mocalum](https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum) and they are provided as 5 tutorials.
 
 
 ## **Tutorial 1: Getting started with `mocalum`**

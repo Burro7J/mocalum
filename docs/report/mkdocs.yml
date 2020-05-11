@@ -1,0 +1,16 @@
+site_name: Monte-Carlo simulations of singe- and dual- Doppler uncertainties
+nav:
+    - Introduction: 0_introduction.md
+    - mocalum package: 1_mocalum.md
+    - Single-Doppler simulations: 2_single-Doppler.md
+    - Dual-Doppler simulations: 3_dual-Doppler.md
+    - Conclusions: 4_conclusions.md
+    - Authors: 5_authors.md
+    - License: 6_license.md
+
+
+
+theme: readthedocs
+
+markdown_extensions:
+    - footnotes

@@ -33,7 +33,7 @@
 ## Getting Started <a name = "getting_started"></a>
 
 ### Prerequisite <a name = "required"></a>
-You must have `conda` or `anaconda` installed on your computer.
+Ideally you should have `conda` or `anaconda` installed on your computer so you can build an isolated `python` environment in which you will install `mocalum`.
 
 
 ### Installing
@@ -49,45 +49,35 @@ conda activate mc_test
 
 Install `mocalum` in the new environment and you are ready to go:
 ```
-pip install git+https://gitlab-internal.windenergy.dtu.dk/e-windlidar/mocalum.git
+pip install git+https://github.com/niva83/mocalum/mocalum.git
 ```
-
-## Running the test <a name = "tests"></a>
-<!-- While in `mocalum` folder go to `test` subfolder
-```
-cd test
-```
-and execute script:
-```
-python test_workflow.py
-``` -->
 
 ## Usage <a name="usage"></a>
+
+In the folder [examples](./examples) you will find [jupyter](https://jupyter.org/) notebook tutorial on how to use `mocalum`. The purpose of the tutorials is to familiarize users with [mocalum](https://github.com/niva83/mocalum) and enable them to quickly build there own workflows with it. The tutorials cover various usage of [mocalum](https://github.com/niva83/mocalum). The tutorials are described in a dedicated [README](./examples/README.md).
 
 ## Built Using <a name = "built_using"></a>
 - [Python](https://www.python.org/) - Languange
 - [xarray](http://xarray.pydata.org/en/stable/#) - Package
 - [numpy](https://numpy.org/) - Package
-- [pandas]() - Package
-- [netCDF4]() - Package
-- [tqdm]() - Package
-- [scipy]() - Package
+- [pandas](https://pandas.pydata.org/) - Package
+- [netCDF4](http://unidata.github.io/netcdf4-python/netCDF4/index.html) - Package
+- [scipy](https://www.scipy.org/) - Package
 - [pyconturb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb) - Package
 
 
 ## Contributors <a name = "authors"></a>
 
 ### Author
-- [Nikola Vasiljevic](@niva) - design, development and testing (DevOps) of `mocalum`
+- [Nikola Vasiljevic](https://orbit.dtu.dk/en/persons/nikola-vasiljevic) - design, development and testing (DevOps) of `mocalum`
 
 ### Contributors
-- [Andrea Vignaroli](@andv) - initial wrapper around [PyConTurb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb), method for conversion of 3D to 4D turbulence box
-- [Bjarke Tobias Olsen](@btol) - hints on how to speed up advance interpolation using [xarray](http://xarray.pydata.org/en/stable/interpolation.html#advanced-interpolation)
-- [Anders Tegtmeier Pedersen](@antp) - `matlab` script to sample correlated uncertainties
+- [Andrea Vignaroli](https://orbit.dtu.dk/en/persons/andrea-vignaroli) - initial wrapper around [PyConTurb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb), method for conversion of 3D to 4D turbulence box
+- [Bjarke Tobias Olsen](https://orbit.dtu.dk/en/persons/bjarke-tobias-olsen) - hints on how to speed up advance interpolation using [xarray](http://xarray.pydata.org/en/stable/interpolation.html#advanced-interpolation)
+- [Anders Tegtmeier Pedersen](https://orbit.dtu.dk/en/persons/anders-tegtmeier-pedersen) - `matlab` script to sample correlated uncertainties
 
 ## How to cite <a name = "cite"></a>
 
 ## Contributing <a name = "contributing"></a>
-
-## Acknowledgements <a name = "acknowledgement"></a>
+If you want to take an active part in the further development of `mocalum` make a pull request or post an issue in this repository.
 
