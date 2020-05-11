@@ -40,7 +40,21 @@ Typical `mocalum` workflow includes following steps (depict in the figure below)
 - `project_to_los`
 - `reconstruct_wind`
 
-as well to `data` that will be created as a result of applying the above listed methods.
+as well to `data` that will be created as a result of applying the above listed methods:
+
+- `xarray` DataSets (to be used by users and `mocalum` methods):
+    - probing dataset
+    - flow field dataset
+    - LOS dataset
+    - reconstructed wind dataset
+
+- `python` dictionaries (used by `mocalum` methods):
+    - flow model config
+    - lidar measurement config
+    - bounding box for measurement points
+    - bounding box for flow field generation
+
+
 
 ### Adding lidar
 
