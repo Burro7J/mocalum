@@ -18,7 +18,7 @@ stages:
 variables:
   # GIT_SUBMODULE_STRATEGY: recursive # assures that submodules are pulled
   BUILD_PATH: channel
-  CONDA_ENV: mocalum
+  CONDA_ENV: mocalum_env
   # INST_PATH:
   PKG_NAME: mocalum
 
