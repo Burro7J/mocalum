@@ -328,5 +328,5 @@ The execution of the method will result in creation of `xarray` dataset containi
 To calculate the uncertainty of the reconstructed wind speed we need first to calculate the difference between the actual and reconstructed wind speed. Afterwards we compute the mean difference (which represent the systematic part of the wind speed uncertainty) and standard deviation of the difference (which represents the random part of the wind speed uncertainty).
 
 If we have generated `uniform` flow field this is rather straightforward since the actual wind speed does not change with time. On the other hand, in case of `turbulent` flow fields the wind speed varies with time, thus we need to extract wind speed at specific time instances. `mocalum` provides method called `generate_virtual_sonic` to perform this type of work. This method takes following parameters:<br>
-- `meas_pts` : measurement points position as (n,3) shaped numpy array
+- `meas_pts` : measurement points position as (n,3) shaped numpy array<br>
 - `time_steps` : numpy array of time instances at which sonic is 'measuring'
