@@ -63,7 +63,8 @@ variables:
 .deploy_docs:
   stage: deploy
   script:
-    - ssh "$DOCS_USER"@"$DOCS_HOST":/web/e-windlidar/$PKG_NAME
+    - ssh niva@e-windlidar.windenergy.dtu.dk
+    # - ssh "$DOCS_USER"@"$DOCS_HOST":/web/e-windlidar/$PKG_NAME
     - ls
     # - scp -r public/* "$DOCS_USER"@"$DOCS_HOST":/web/e-windlidar/$PKG_NAME
 
