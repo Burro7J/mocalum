@@ -9,7 +9,7 @@
 stages:
   # - test
   - build
-  # - deploy
+  - deploy
 
 ########################################
 # Variables
@@ -56,9 +56,15 @@ variables:
     - echo `whoami`
     - source activate $CONDA_ENV
     - pip install -v .          # install mocalum package before test
-
   after_script:
     - pip uninstall -y $PKG_NAME # uninstall mocalum package after test
+
+
+.deploy_docs:
+  stage: deploy
+  script:
+    - scp -r public/* "$DOCS_USER"@"$DOCS_HOST":/web/e-windlidar/$PKG_NAME
+
 
 ########################################
 # Configurations and template modifiers
@@ -112,9 +118,9 @@ report_build:
     - mkdocs build
     - cd ../../; mv docs/report/site public/
   allow_failure: false
-  artifacts:
-    paths: [public,]
-    expire_in: 1 week
+    artifacts:
+      paths: [public,]
+      expire_in: 1 week
   <<: *not_feat_branch
   <<: *mac
 
@@ -122,3 +128,10 @@ report_build:
 ########################################
 # Stage: Deploy
 ########################################
+
+
+# Release documentation deploy:
+report_deploy:
+  extends: .deploy_docs
+  <<: *not_feat_branch
+  <<: *mac
