@@ -3,7 +3,7 @@
 `mocalum` is a python package for Monte Carlo based lidar uncertainty modeling. It has following features:
 
 - Fast Monte Carlo uncertainty modeling
-- Simulation of single or multi lidar configuration
+- Simulation of single or multi lidar configurations
 - Configuration of arbitrary trajectories for single and multi lidars
 - Configuration of [IVAP](https://journals.ametsoc.org/doi/10.1175/JTECH2047.1) (sector-scan) trajectory for single lidar
 - 3D or 4D / uniform or turbulent flow field generation
@@ -196,7 +196,7 @@ mc_test.data.probing['koshava']
 
 Visually our measurement scenario is shown in the figure below.
 
-![mocalum workflow](./assets/koshava_PPI_scan.png)
+![mocalum workflow](./assets/sd_scan_perfect.png)
 
 **Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
 
@@ -210,12 +210,81 @@ mc_test.generate_uncertainties('koshava')
 
 If we now visually represent the measurement scenario (see Figure 3) we can notice that the previously perfect arc scan (Figure 2) became 'crooked' because the uncertainties in the laser beam positioning have been injected.
 
-![mocalum workflow](./assets/koshava_PPI_scan_crooked.png)
+![mocalum workflow](./assets/sd_scan.png)
 
 **Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
 
 
+As we sample and inject the uncertainties into the probing datasets the actual volume within which the probing takes place will enlarge. The information about bounding box around the measurement points is saved as a python `dictionary`. As such, it represents a convenient way of fetching the information about the dimensions to generate the flow field by internal `mocalum` method. Here is an example of bounding box dict for `koshava` which is accessible via `.data.bbox_meas_pts[lidar_id]`:
+
+```
+mc_test.data.bbox_meas_pts['koshava']
+```
+
+```
+{'CRS': {'x': 'Absolute coordinate, corresponds to Easting in m',
+  'y': 'Absolute coordinate, corresponds to Northing in m',
+  'z': 'Absolute coordinate, corresponds to height above sea level in m',
+  'rot_matrix': array([[ 1.,  0.],
+         [-0.,  1.]])},
+ 'x': {'min': 919.0619309735225,
+  'max': 1042.6979161781533,
+  'offset': 0,
+  'res': 25},
+ 'y': {'min': -273.7636264604222,
+  'max': 292.0006588353198,
+  'offset': 0,
+  'res': 25},
+ 'z': {'min': 86.55328669932726,
+  'max': 113.27967440963353,
+  'offset': 0,
+  'res': 5},
+ 't': {'min': 1.0, 'max': 300000.0, 'offset': 0, 'res': 1.0}}
+```
+
 ### Generating flow field
+Currently, `mocalum`, through the method `generate_flow_field`, provides means to generate:
+- `uniform` flow field assuming that wind is only changing with height according to the [power law](https://en.wikipedia.org/wiki/Wind_profile_power_law)
+- `turbulent` flow field which is generated using a wrapper around [pyconturb](https://gitlab.windenergy.dtu.dk/pyconturb/pyconturb)
+
+Based on the measurement scenario `mocalum` calculates necessary dimensions and resolution of flow field box (3D for uniform or 4D for turbulent), generates the flow field data and saves them as `xarray` dataset. For this tutorial we will generate `uniform` flow field. The method `generate_flow_field` requires following input parameters:
+
+- `lidar_id` : string or list of string corresponding to lidar ids
+- `atmo_cfg` : dictionary describing mean flow parameters, containing following keys:
+
+    - `wind_speed` : mean horizontal wind speed in m/s
+    - `upward_velocity` : vertical wind speed in m/s
+    - `wind_from_direction` : mean wind direction in deg
+    - `reference_height` : height at which wind speed is given in m
+    - `shear_exponent` : vertical wind shear exponent
+
+- `flow_type` : flow field type to be generated, it can be `uniform` or `turbulent`
+
+When the method `generate_flow_field` is executed it takes bounding box information, in this case for one lidar, and creates the appropriate size of 3D or 4D data structure, runs the flow model, and populates the data structure with wind vector information. Let's start with `uniform` flow field generation in which the flow only changes with height according to the [power law wind profile](https://en.wikipedia.org/wiki/Wind_profile_power_law). Even though the generated flow field dataset could contain only one dimensional coordinate (i.e, height above the ground level), for the purpose of keeping the `mocalum` backend more generic a 3D dataset is created.
+
+If we visualize the extent of the flow field dataset in 2D we can see that it entails all the measurement points:
+
+![mocalum workflow](./assets/bbox.png)
+
+**Figure 3.** Bounding box around measurement points, red arrow indicates wind direction.
+
+
+As mentioned earlier `turbulent` flow fields are generated using `pyconturb`. By default, `pyconturb` can generate 3D turbulence box aligned with the mean wind direction, which coordinates are: `time` , height and `y'` which is orthogonal to the wind direction. Usually the length of the generated turbulence box is 600s ~ 10 min. Directly we cannot use the `pyconturb` turbulence box in `mocalum`, since it requires either 3D spatially structured flow field data or 4D (space and time). That's the reason why a wrapper, containing the data wrangler which restructures the `pyconturb` output, was made in `mocalum`. This wrapper converts `pyconturb` 3D turbulence box, which contains a mixture of spatial and time coordinates, first to 3D spatial datasets and then into 4D dataset. The conversion from 3D to 4D is done considering the *Taylor Frozen Turbulence Hypothesis*. Basically, we can view the `time` coordinate as an `x'` coordinate which is inline with the wind direction (see figure below).
+
+
+<img align="center" src="assets/turb_start.png">
+
+The time steps of 3D turbulence box are converted to `x'` coordinates considering the following expressions:
+
+<img src="https://latex.codecogs.com/svg.latex?\Large&space; x'_{i}= V_{mean} * t_{i}" title="x coordinate" />
+<br>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space; t_{i} = i*\Delta t, i=0,1,..,N" title="x coordinate" />
+
+If we have a long enough turbulence box we can perform a sliding window slicing, where the window size is sufficient to cover the measurement points, and convert 3D into 4D turbulence box:
+
+<img align="center" src="assets/3D_to_4D.png">
+
+This is exactly what `mocalum` is doing. Prequel to the data wrangling, `mocalum` considers the bounding boxes around the measurement points and efficiently configures `pyconturb` to generate the initial turbulence box.
 
 ### Wind reconstruction
 ### Uncertainty analysis

@@ -43,7 +43,9 @@ def plot_sd_scan_setup(lidar_id, mc_obj):
     plt.xlabel('Easting [m]')
     plt.ylabel('Northing [m]')
 
+    plt.tight_layout()
     plt.show()
+    fig.savefig('./assets/sd_scan.png', bbox_inches='tight')
 
 def plot_md_scan_setup(lidar_ids, mc_obj):
     """
@@ -211,11 +213,13 @@ def plot_bbox(mc_obj):
                         c='black',alpha=0.4)
     ax.add_patch(flowbox)
     ax.set_aspect('equal')
-    plt.legend(loc="lower right")
+    plt.legend(loc="lower left")
     plt.xlabel('Easting [m]')
     plt.ylabel('Northing [m]')
 
+    plt.tight_layout()
     plt.show()
+    fig.savefig('./assets/bbox.png', bbox_inches='tight')
 
 
 def plot_ffield(mc_obj):
