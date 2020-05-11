@@ -45,11 +45,13 @@ as well to `data` that will be created as a result of applying the above listed 
 ### Adding lidar
 
 `add_lidar` method is used to add lidar(s) to the `mocalum` object instance. This method requires following input parameters:
+
 - `id` of lidar
 - `lidar position` as `numpy` array of triplets (x, y, z)
 - `uncertainty dictionary` containing configuration of uncertainty contributors
 
 The `uncertainty dictionary` contains values as standard uncertainties of each contributor to the total wind reconstruction uncertainty. The uncertainty contributors are:
+
 - estimation uncertainty of radial velocity (in m/s)
 - ranging uncertainty (in m)
 - azimuth uncertainty (in deg)
@@ -101,8 +103,10 @@ which returns:
 Following the lidar placement and uncertainty configuration an user configures the measurement scenario which lidar will 'virtually' perform. Two methods are available to this, either the user can configure `PPI` or complex trajectory scans, using methods `generate_PPI_scan` and `generate_complex_trajectory` respectively.
 
 `generate_PPI_scan` method requires following input parameters:
+
 - lidar id for which the PPI scan is configured
 - PPI scan dictionary containing following required parameters:
+
     - `sector_size` : size of the scanned sector in degrees
     - `azimuth_mid` : central azimuth angle of the PPI scanned arc
     - `angular_step` : Incremental step performed to complete a PPI scan
@@ -110,18 +114,24 @@ Following the lidar placement and uncertainty configuration an user configures t
     - `elevation` : elevation angle of PPI scan
     - `range` : range at which measurements should take place
     - `no_scans` : number of PPI scans must be equal or bigger than 1
+
 while following parameters are optional:
+
 - `max_speed` : maximum permitted angular speed
 - `max_acc` : maximum permitted angular acceleration
 
 
 Similarly, `generate_complex_trajectory` method requires following parameters:
+
 - lidar ids provided as a list of strings for which the complex trajectory will be generated
-- Scan configuration as a dictionary containing with folloiwng key-value pairs:
+- Scan configuration as a dictionary containing with following key-value pairs:
+
     - `points` : `numpy` array of measurement points provided as triplets of coordinates (x, y, z)
     - `no_scans` : number of scans through the points
     - `acq_time` : acquisition time of LOS measurements
+
 while following parameters are optional:
+
 - `max_speed` : max permitted angular speed
 - `max_acc` : max permitted angular acceleration
 - `sync` : indicates whether to synchronize ('sync':True) or not ('sync':False) motion among multiple lidars
