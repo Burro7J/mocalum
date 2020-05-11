@@ -15,6 +15,7 @@
 ## `mocalum` workflow
 
 Typical `mocalum` workflow includes following steps (depict in the figure below):
+
 1. Creating `mocalum` object
 1. Adding lidar(s) and configuring uncertainty contributors to the object
 2. Setting up measurement scenario for previously added lidar(s)
