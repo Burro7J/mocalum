@@ -212,7 +212,7 @@ If we now visually represent the measurement scenario (see Figure 3) we can noti
 
 ![mocalum workflow](./assets/sd_scan.png)
 
-**Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
+**Figure 3.** Lidar `koshava` performing a virtual `PPI` scan (uncertainties injected).
 
 
 As we sample and inject the uncertainties into the probing datasets the actual volume within which the probing takes place will enlarge. The information about bounding box around the measurement points is saved as a python `dictionary`. As such, it represents a convenient way of fetching the information about the dimensions to generate the flow field by internal `mocalum` method. Here is an example of bounding box dict for `koshava` which is accessible via `.data.bbox_meas_pts[lidar_id]`:
@@ -266,7 +266,7 @@ If we visualize the extent of the flow field dataset in 2D we can see that it en
 
 ![mocalum workflow](./assets/bbox.png)
 
-**Figure 3.** Bounding box around measurement points, red arrow indicates wind direction.
+**Figure 4.** Bounding box around measurement points, red arrow indicates wind direction.
 
 
 As mentioned earlier `turbulent` flow fields are generated using `pyconturb`. By default, `pyconturb` can generate 3D turbulence box aligned with the mean wind direction, which coordinates are: `time` , height and `y'` which is orthogonal to the wind direction. Usually the length of the generated turbulence box is 600s ~ 10 min. Directly we cannot use the `pyconturb` turbulence box in `mocalum`, since it requires either 3D spatially structured flow field data or 4D (space and time). That's the reason why a wrapper, containing the data wrangler which restructures the `pyconturb` output, was made in `mocalum`. This wrapper converts `pyconturb` 3D turbulence box, which contains a mixture of spatial and time coordinates, first to 3D spatial datasets and then into 4D dataset. The conversion from 3D to 4D is done considering the *Taylor Frozen Turbulence Hypothesis*. Basically, we can view the `time` coordinate as an `x'` coordinate which is inline with the wind direction (see figure below).
@@ -274,7 +274,7 @@ As mentioned earlier `turbulent` flow fields are generated using `pyconturb`. By
 
 
 ![turbulence box](./assets/turb_start.png)
-**Figure 4.** Turbulence box with respect to absolute coordinates
+**Figure 5.** Turbulence box with respect to absolute coordinates
 
 The time steps of 3D turbulence box are converted to `x'` coordinates considering the following expressions:
 
@@ -286,10 +286,33 @@ If we have a long enough turbulence box we can perform a sliding window slicing,
 
 
 ![3D into 4D turbulence box](./assets/3D_to_4D.png)
-**Figure 5.** From 3D to 4D dataset
+**Figure 6.** From 3D to 4D dataset
 
 
 This is exactly what `mocalum` is doing. Prequel to the data wrangling, `mocalum` considers the bounding boxes around the measurement points and efficiently configures `pyconturb` to generate the initial turbulence box.
 
+### Projection of flow field
+
+At this point in the workflow we have all elements to calculate what wind lidar would measure, thus to project the flow field on the lidar LOSs. We do this using method `project_to_los`, which we supply with id of the lidar. This method will create yet another `xarray` dataset stored under `data.los['lidar_id']`.
+
+
 ### Wind reconstruction
+
+To reconstruct wind vector from radial wind speeds we use method `reconstruct_wind` which requires following inputs:
+
+- `lidar_id` : lidar id(s) for which reconstruction is performed
+- `rc_method`: wind vector reconstruction method, which can be `IVAP`, `dual-Doppler` or `triple-Doppler`
+
+and optional parameter:
+
+- `no_scans_avg`: number of scans to average prior reconstruction (optional)
+
+The execution of the method will result in creation of `xarray` dataset containing the reconstructed wind vector (`data.rc_win`).
+
+
 ### Uncertainty analysis
+To calculate the uncertainty of the reconstructed wind speed we need first to calculate the difference between the actual and reconstructed wind speed. Afterwards we compute the mean difference (which represent the systematic part of the wind speed uncertainty) and standard deviation of the difference (which represents the random part of the wind speed uncertainty).
+
+If we have generated `uniform` flow field this is rather straightforward since the actual wind speed does not change with time. On the other hand, in case of `turbulent` flow fields the wind speed varies with time, thus we need to extract wind speed at specific time instances. `mocalum` provides method called `generate_virtual_sonic` to perform this type of work. This method takes following parameters:
+ - `meas_pts` : measurement points position as (n,3) shaped numpy array
+ - `time_steps` : numpy array of time instances at which sonic is 'measuring'
