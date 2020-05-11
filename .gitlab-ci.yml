@@ -7,8 +7,8 @@
 # Order of stages
 ########################################
 stages:
-  - test
-  # - build
+  # - test
+  - build
   # - deploy
 
 ########################################
@@ -49,6 +49,17 @@ variables:
     # - jupyter-nbconvert --to notebook --execute *.ipynb
     - pytest --nbval-lax # other way of testing notebook which fails if there are plots!
 
+
+.build_docs:
+  stage: build
+  before_script:
+    - echo `whoami`
+    - source activate $CONDA_ENV
+    - pip install -v .          # install mocalum package before test
+
+  after_script:
+    - pip uninstall -y $PKG_NAME # uninstall mocalum package after test
+
 ########################################
 # Configurations and template modifiers
 ########################################
@@ -83,15 +94,30 @@ variables:
 # Stage: Test
 ########################################
 
-# Master and release branches tests [notebook]:
-nofeat_notebook_test_mac:
-  extends: .notebook_test_template
-  <<: *not_feat_branch
-  <<: *mac
+# # Master and release branches tests [notebook]:
+# nofeat_notebook_test_mac:
+#   extends: .notebook_test_template
+#   <<: *not_feat_branch
+#   <<: *mac
 
 ########################################
 # Stage: Build
 ########################################
+
+# Build Orsted report:
+report_build:
+  extends: .build_docs
+  script:
+    - cd docs/report
+    - mkdocs build
+    - cd ../../; mv docs/report/site public/
+  allow_failure: false
+  artifacts:
+    paths: [public,]
+    expire_in: 1 week
+  <<: *not_feat_branch
+  <<: *mac
+
 
 ########################################
 # Stage: Deploy

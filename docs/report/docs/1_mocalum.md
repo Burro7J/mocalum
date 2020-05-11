@@ -11,7 +11,7 @@
  - 3D or 4D interpolation/projection of flow on lidar(s) line-of-sight(s)
  - [xarray](http://xarray.pydata.org/en/stable/#) datasets enriched with metadata
 
- # `mocalum` workflow
+## `mocalum` workflow
 
 
  Typical `mocalum` workflow includes following steps (depict in the figure below):
@@ -28,7 +28,7 @@
 
  **Figure 1.** `mocalum` workflow
 
-## `mocalum` object
+### `mocalum` object
  `mocalum` is developed considering [object-oriented paradigm](https://realpython.com/python3-object-oriented-programming/). Therefore, all calculations and access to generated data are through an instance of `mocalum` object on which various methods are applied. Once an instance of `mocalum` object is created users have access to following methods:
 
 - `add_lidar`
@@ -41,7 +41,7 @@
 
 as well to `data` that will be created as a result of applying the above listed methods.
 
-### Adding lidar and configuring uncertainty contributors
+### Adding lidar
 
 `add_lidar` method is used to add lidar(s) to the `mocalum` object instance. This method requires following input parameters:
 - `id` of lidar
@@ -202,3 +202,10 @@ If we now visually represent the measurement scenario (see Figure 3) we can noti
 ![mocalum workflow](./assets/koshava_PPI_scan_crooked.png)
 
  **Figure 2.** Lidar `koshava` performing a virtual `PPI` scan.
+
+
+ ### Generating flow field
+
+ ### Wind reconstruction
+
+ ### Uncertainty analysis
