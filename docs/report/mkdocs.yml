@@ -1,4 +1,4 @@
-site_name: Monte-Carlo simulations of singe- and dual- Doppler uncertainties
+site_name: Monte-Carlo uncertainty modeling
 nav:
     - Introduction: 0_introduction.md
     - mocalum package: 1_mocalum.md

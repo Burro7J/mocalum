@@ -272,7 +272,9 @@ If we visualize the extent of the flow field dataset in 2D we can see that it en
 As mentioned earlier `turbulent` flow fields are generated using `pyconturb`. By default, `pyconturb` can generate 3D turbulence box aligned with the mean wind direction, which coordinates are: `time` , height and `y'` which is orthogonal to the wind direction. Usually the length of the generated turbulence box is 600s ~ 10 min. Directly we cannot use the `pyconturb` turbulence box in `mocalum`, since it requires either 3D spatially structured flow field data or 4D (space and time). That's the reason why a wrapper, containing the data wrangler which restructures the `pyconturb` output, was made in `mocalum`. This wrapper converts `pyconturb` 3D turbulence box, which contains a mixture of spatial and time coordinates, first to 3D spatial datasets and then into 4D dataset. The conversion from 3D to 4D is done considering the *Taylor Frozen Turbulence Hypothesis*. Basically, we can view the `time` coordinate as an `x'` coordinate which is inline with the wind direction (see figure below).
 
 
-<img align="center" src="assets/turb_start.png">
+
+![turbulence box](./assets/turb_start.png)
+**Figure 4.** Turbulence box with respect to absolute coordinates
 
 The time steps of 3D turbulence box are converted to `x'` coordinates considering the following expressions:
 
@@ -282,7 +284,10 @@ The time steps of 3D turbulence box are converted to `x'` coordinates considerin
 
 If we have a long enough turbulence box we can perform a sliding window slicing, where the window size is sufficient to cover the measurement points, and convert 3D into 4D turbulence box:
 
-<img align="center" src="assets/3D_to_4D.png">
+
+![3D into 4D turbulence box](./assets/3D_to_4d.png)
+**Figure 5.** From 3D to 4D dataset
+
 
 This is exactly what `mocalum` is doing. Prequel to the data wrangling, `mocalum` considers the bounding boxes around the measurement points and efficiently configures `pyconturb` to generate the initial turbulence box.
 
