@@ -285,8 +285,7 @@ The time steps of 3D turbulence box are converted to `x'` coordinates considerin
 If we have a long enough turbulence box we can perform a sliding window slicing, where the window size is sufficient to cover the measurement points, and convert 3D into 4D turbulence box:
 
 
-![3D into 4D turbulence box](./assets/3D_to_4d.png)
-
+![3D into 4D turbulence box](./assets/3D_to_4D.png)
 **Figure 5.** From 3D to 4D dataset
 
 
