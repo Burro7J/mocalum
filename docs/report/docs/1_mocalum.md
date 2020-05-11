@@ -286,6 +286,7 @@ If we have a long enough turbulence box we can perform a sliding window slicing,
 
 
 ![3D into 4D turbulence box](./assets/3D_to_4d.png)
+
 **Figure 5.** From 3D to 4D dataset
 
 
