@@ -1,4 +1,4 @@
-site_name: Monte-Carlo uncertainty modeling
+site_name: Lidar Uncertainty Modeling
 nav:
     - Introduction: 0_introduction.md
     - mocalum package: 1_mocalum.md
