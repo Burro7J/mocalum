@@ -88,6 +88,7 @@ def plot_md_scan_setup(lidar_ids, mc_obj):
     plt.ylabel('Northing [m]')
 
     plt.show()
+    fig.savefig('./assets/md_setup.png', bbox_inches='tight')
 
 
 def spher2cart(azimuth, elevation, radius):
