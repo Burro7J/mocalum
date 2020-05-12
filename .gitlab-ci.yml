@@ -8,8 +8,8 @@
 ########################################
 stages:
   # - test
-  - build
-  - deploy
+  # - build
+  # - deploy
 
 ########################################
 # Variables
@@ -110,28 +110,21 @@ variables:
 # Stage: Build
 ########################################
 
-# Build Orsted report:
-report_build:
-  extends: .build_docs
-  script:
-    - cd docs/report
-    - mkdocs build
-    - cd ../../; mv docs/report/site public/
-  allow_failure: false
-  artifacts:
-      paths: [public,]
-      expire_in: 1 week
-  <<: *not_feat_branch
-  <<: *mac
+# # Build Orsted report:
+# report_build:
+#   extends: .build_docs
+#   script:
+#     - cd docs/report
+#     - mkdocs build
+#     - cd ../../; mv docs/report/site public/
+#   allow_failure: false
+#   artifacts:
+#       paths: [public,]
+#       expire_in: 1 week
+#   <<: *not_feat_branch
+#   <<: *mac
 
 
 ########################################
 # Stage: Deploy
 ########################################
-
-
-# Deply Orsted report:
-report_deploy:
-  extends: .deploy_docs
-  <<: *not_feat_branch
-  <<: *mac
