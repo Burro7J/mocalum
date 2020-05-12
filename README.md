@@ -78,6 +78,10 @@ In the folder [examples](./examples) you will find [jupyter](https://jupyter.org
 
 ## How to cite <a name = "cite"></a>
 
+
+[![DOI](https://zenodo.org/badge/262975742.svg)](https://zenodo.org/badge/latestdoi/262975742)
+
+
 ## Contributing <a name = "contributing"></a>
 If you want to take an active part in the further development of `mocalum` make a pull request or post an issue in this repository.
 
