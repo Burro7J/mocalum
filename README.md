@@ -33,7 +33,7 @@
 ## Getting Started <a name = "getting_started"></a>
 
 ### Prerequisite <a name = "required"></a>
-Ideally you should have `conda` or `anaconda` installed on your computer so you can build an isolated `python` environment in which you will install `mocalum`.
+Ideally, you should have `conda` or `anaconda` installed on your computer so you can build an isolated `python` environment in which you will install `mocalum`.
 
 
 ### Installing
@@ -54,7 +54,7 @@ pip install git+https://github.com/niva83/mocalum/mocalum.git
 
 ## Usage <a name="usage"></a>
 
-In the folder [examples](./examples) you will find [jupyter](https://jupyter.org/) notebook tutorial on how to use `mocalum`. The purpose of the tutorials is to familiarize users with [mocalum](https://github.com/niva83/mocalum) and enable them to quickly build there own workflows with it. The tutorials cover various usage of [mocalum](https://github.com/niva83/mocalum). The tutorials are described in a dedicated [README](./examples/README.md).
+In the folder [examples](./examples) you will find [jupyter](https://jupyter.org/) notebook tutorials on how to use `mocalum`. The purpose of the tutorials is to familiarize users with [mocalum](https://github.com/niva83/mocalum) and enable them to quickly build there own workflows with this package. The tutorials cover various usage of [mocalum](https://github.com/niva83/mocalum). The tutorials are described in a dedicated [README](./examples/README.md).
 
 ## Built Using <a name = "built_using"></a>
 - [Python](https://www.python.org/) - Languange
