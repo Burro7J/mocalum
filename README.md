@@ -13,9 +13,10 @@
 - [Usage](#usage)
 - [Built Using](#built_using)
 - [Contributors](#authors)
-- [How to contribute](#contributing)
 - [How to cite](#cite)
-- [Acknowledgments](#acknowledgement)
+- [How to contribute](#contributing)
+
+<!-- - [Acknowledgments](#acknowledgement) -->
 <!-- - [TODO](../TODO.md) -->
 
 ## About <a name = "about"></a>
