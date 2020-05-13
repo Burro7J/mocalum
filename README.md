@@ -30,6 +30,9 @@
  - 3D or 4D interpolation/projection of flow on lidar(s) line-of-sight(s)
  - [xarray](http://xarray.pydata.org/en/stable/#) datasets enriched with metadata
 
+A presentation summarizing `mocalum` features is available on [Zenodo](https://zenodo.org/record/3823878).
+The package documentation is available [online](http://e-windlidar.windenergy.dtu.dk/reports/sd-dd-uncertainty/).
+
 ## Getting Started <a name = "getting_started"></a>
 
 ### Prerequisite <a name = "required"></a>
@@ -78,6 +81,7 @@ In the folder [examples](./examples) you will find [jupyter](https://jupyter.org
 
 ## How to cite <a name = "cite"></a>
 
+Click on the badge below:
 
 [![DOI](https://zenodo.org/badge/262975742.svg)](https://zenodo.org/badge/latestdoi/262975742)
 
