@@ -53,7 +53,7 @@ conda activate mc_test
 
 Install `mocalum` in the new environment and you are ready to go:
 ```
-pip install git+https://github.com/niva83/mocalum/mocalum.git
+pip install git+https://github.com/niva83/mocalum.git
 ```
 
 ## Usage <a name="usage"></a>
