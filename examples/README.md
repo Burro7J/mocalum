@@ -2,6 +2,11 @@
 
 Here you will find examples on how to use [mocalum](https://github.com/niva83/mocalum) provided as [jupyter](https://jupyter.org/) notebooks. The purpose of the examples is to familiarize users with [mocalum](https://github.com/niva83/mocalum) and enable them to quickly build there own workflows with it. The examples cover various usage of [mocalum](https://github.com/niva83/mocalum) and they are provided as 5 tutorials.
 
+Make sure you install `jupyter` package in the conda enviroment in which you have `mocalum` installed using command:
+```bash
+conda install jupyter
+```
+
 
 ## **Tutorial 1: Getting started with `mocalum`**
 This [tutorial](./tutorial-01) introduces the fundamental methods and data structures of `mocalum`, such as:
