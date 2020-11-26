@@ -1,4 +1,4 @@
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/niva83/mocalum/HEAD)
+[![DOI](https://zenodo.org/badge/262975742.svg)](https://zenodo.org/badge/latestdoi/262975742) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/niva83/mocalum/HEAD)
 
 <h3 align="center">MOCALUM</h3>
 <h4 align="center">Monte Carlo based Lidar Uncertainty Model</h4>
